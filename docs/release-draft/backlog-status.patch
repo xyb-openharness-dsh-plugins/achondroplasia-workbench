@@ -1,0 +1,13 @@
+diff --git a/BACKLOG.md b/BACKLOG.md
+index 259b1fe..d3297f8 100644
+--- a/BACKLOG.md
++++ b/BACKLOG.md
+@@ -344,7 +344,7 @@
+ 
+ | # | 疾病 | 页 | 级别 | 状态 | 招募对象 |
+ | --- | --- | --- | --- | --- | --- |
+-| 1 | 软骨发育不全 | 1 | **T0 R3 样板** | 🔥 优先招募 | 👨‍👩‍👧🤝📝🩺💻（R3 样板） |
++| 1 | 软骨发育不全 | 1 | **T0 R3 样板** | 🔵 [achondroplasia-workbench](https://github.com/xyb-openharness-dsh-plugins/achondroplasia-workbench) v0.2.0（2026-11-05 夜班认领开发，小苗宝 GrowPal，[Issue #60](https://github.com/xyb-openharness-dsh-plugins/.github/issues/60)；M0–M6 完成：G1–G3/V1/V2(产物层) 自动签认待晨审追认，开发版+装机 0.2.0；V3 真机待重启 Desktop） | 👨‍👩‍👧🤝📝🩺 补位 |
+ | 5 | 阿拉杰里综合征 | 22 | T2 | ⬜ 招募中 | 👨‍👩‍👧🤝📝 |
+ | 8 | Bardet-Biedl 综合征 | 40 | T2 | ⬜ 招募中 | 👨‍👩‍👧🤝📝 |
+ | 10 | 蓝色橡皮疱样痣 | 57 | T2 | ⬜ 招募中 | 👨‍👩‍👧🤝📝 |
