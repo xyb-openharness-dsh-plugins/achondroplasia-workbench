@@ -45,7 +45,7 @@ const SUBPAGES = {
   trial: [['match', '匹配'], ['search', '检索'], ['saved', '收藏与跟踪']]
 };
 const GROWTH_TAB_DESC = {
-  overview: '生长轨迹一图：每条序列独立条带、按自身范围缩放，不同指标不可比。',
+  overview: '生长轨迹一图：每条线按该指标全部记录范围缩放（min–max），不同指标不可比；事件带在上方分层。',
   cards: '指标卡：最近值、较上次、来源与次数；翻卡看口径说明。',
   recent: '最近测量记录（原始值逐条）。',
   cands: 'AI/导入候选：逐项核对后入库，拒收零副作用。',
@@ -214,36 +214,96 @@ function goHash(page, sub) {
   if (location.hash !== target) location.hash = target; else render();
 }
 
-/* ---------------- 看板（dash） ---------------- */
+/* ---------------- 看板（dash）：hero + 竖条状态卡 + 数据行动带 + 快捷卡 + 最近变化/待办（小粉宝结构，R3 语义） ---------------- */
+function miniTrendCard(code) {
+  const m = CATALOG[code]
+  const dated = allMeasures(code).filter((x) => dOf(x.d))
+  if (!dated.length) return ''
+  const pts = dated.slice(-8)
+  const w = 560, h = 120, padX = 16, padT = 14, padB = 26
+  const vals = pts.map((x) => x.v)
+  const lo = Math.min(...vals), hi = Math.max(...vals)
+  const span = hi - lo || Math.max(Math.abs(hi) * .08, 1)
+  const coords = pts.map((x, i) => ({ x: padX + i * (w - padX * 2) / Math.max(pts.length - 1, 1), y: h - padB - ((x.v - lo) / span) * (h - padT - padB), d: x.d, v: x.v }))
+  const last = coords[coords.length - 1]
+  const t0 = pts[0].d, t1 = pts[pts.length - 1].d
+  return `<div class="card mini-card">
+    <div class="mini-head"><div><b>${esc(m.name)}</b><p class="small-note">${esc(m.cat)} · ${dated.length} 次记录 · ${esc(t0.slice(5))} 起</p></div>${pill('原始值并列 · 不判定', 'grey')}</div>
+    <svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(m.name)}最近 ${pts.length} 次记录折线（原始值末点标注）">
+      <line x1="${padX}" x2="${w - padX}" y1="${h - padB}" y2="${h - padB}" stroke="#e2e8de"/>
+      ${coords.length > 1 ? `<path d="${smoothPath(coords)}" fill="none" stroke="${m.color}" stroke-width="2.4" stroke-linecap="round"/>` : ''}
+      ${coords.map((c, i) => `<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${i === coords.length - 1 ? 4 : 2.8}" fill="${m.color}" stroke="#fff" stroke-width="1.2"/>`).join('')}
+      <text x="${Math.min(last.x, w - 30).toFixed(1)}" y="${(last.y - 9).toFixed(1)}" text-anchor="middle" font-size="12" font-weight="700" fill="${m.color}">${esc(num(last.v))}</text>
+      <text x="${padX}" y="${h - 8}" font-size="10" fill="#7c877b">${esc(t0)}</text>
+      <text x="${w - padX}" y="${h - 8}" font-size="10" fill="#7c877b" text-anchor="end">${esc(t1)}</text>
+    </svg>
+    <div class="mini-stats"><span><b>${esc(num(last.v))}${m.unit ? ' ' + esc(m.unit) : ''}</b> 最新值</span><span><b>${dated.length}</b> 次测量</span><span><b>${allQuestions().filter((q) => !q.asked).length}</b> 个待问问题</span></div>
+  </div>`
+}
+function todoList() {
+  const p = profile()
+  const items = []
+  if (p.dash?.nextVisit && !/待约/.test(p.dash.nextVisit)) items.push({ d: (p.dash.nextVisit.match(/\d{4}-\d{2}-\d{2}/) || [''])[0] || '待约', t: p.dash.nextVisit, src: '档案 · 下次安排' })
+  allQuestions().filter((q) => !q.asked).slice(0, 2).forEach((q) => items.push({ d: '待问', t: q.q, src: '待问清单' }))
+  const pend = (profile().candidates || []).length
+  if (pend) items.push({ d: '待核对', t: `${pend} 条候选待核对入库`, src: '生长记录 · 待核对' })
+  if (!items.length) return emptyBox('暂无待办', '记录候选核对、待问清单和下次安排会出现在这里。', `${btn('去记一次测量', 'form-measure', 'primary')}${go('回到看板', 'dash', '', 'soft')}`)
+  return `<div class="card todo-card"><p class="small-note" style="margin-bottom:8px">${items.length} 项待办</p>
+    ${items.map((it) => `<div class="todo-row"><span class="todo-dot" aria-hidden="true"></span><div><span class="nowrap-num todo-d">${esc(it.d)}</span><b>${esc(it.t)}</b><span class="small-note">${esc(it.src)}</span></div></div>`).join('')}</div>`
+}
 function pageDash() {
-  const p = profile();
-  const fam = p.family?.notes || [];
-  const h = lastOf(allMeasures('HEIGHT'));
-  const w = lastOf(allMeasures('WEIGHT'));
-  const scrCount = SCREEN_CATS.reduce((n, c) => n + allScreenings(c.id).length, 0);
-  const injOk = allInjections().filter((i) => i.done === '已注射').length;
-  const privN = privateCount(fam);
-  const sharedN = sharedOnly(fam).length;
+  const p = profile()
+  const fam = p.family?.notes || []
+  const h = lastOf(allMeasures('HEIGHT'))
+  const prev = prevOf(allMeasures('HEIGHT'))
+  const dh = h && prev && dOf(prev.d) ? (h.v - prev.v) : null
+  const w = lastOf(allMeasures('WEIGHT'))
+  const scrCount = SCREEN_CATS.reduce((n, c) => n + allScreenings(c.id).length, 0)
+  const injOk = allInjections().filter((i) => i.done === '已注射').length
+  const privN = privateCount(fam)
+  const pendN = (p.candidates || []).length
+  const checkedN = p.docs.filter((d) => d.status === '已入库').length
+  const stage = p.dash.stage
+  const deltaSentence = h ? `最近身高 <b class="nowrap-num">${esc(num(h.v))} cm</b>${dh === null ? '' : `，较上次 <b class="nowrap-num">${dh > 0 ? '+' : ''}${esc(num(dh))} cm</b>`}` : '还没有身高记录'
   const quick = [
     { icon: '📈', t: '记一次测量', d: '身高/体重/头围，含测量来源', page: 'growth', sub: 'recent' },
     { icon: '🩺', t: '登记筛查结果', d: '听力/睡眠/影像等报告原文', page: 'screening', sub: 'ledger' },
-    { icon: '🧳', t: '生成资料包', d: '复诊前一键汇总与导出', page: 'visit', sub: 'pack' }
-  ];
+    { icon: '🧳', t: pendN ? '生成资料包' : '生成资料包', d: pendN ? `${pendN} 条候选待核对 · 复诊前一键汇总` : '复诊前一键汇总与导出', page: 'visit', sub: 'pack' }
+  ]
   return `
-  <div class="dash-status">
-    <span class="eyebrow">${esc(p.name)} · ${esc(p.age)} · ${esc(CARE_LABEL[p.careRole])}</span>
-    <div class="big">${esc(p.dash.stage)}</div>
-    <p class="sub">${esc(p.dash.anchorLabel)} <b class="nowrap-num">${p.dash.anchorDays}</b> 天 · 最近身高 <b class="nowrap-num">${h ? esc(num(h.v)) + ' cm（' + esc(h.d) + '）' : '未记录'}</b> · 最近体重 <b class="nowrap-num">${w ? esc(num(w.v)) + ' kg' : '未记录'}</b></p>
-    <p class="sub">下次：${esc(p.dash.nextVisit)}</p>
-    <p class="quote">${esc(p.dash.doctorQuote)}</p>
-    <p class="sub small">${esc(p.dash.modeNote)}</p>
+  <div class="hero">
+    <div class="hero-left">
+      <span class="eyebrow2">GROWPAL / GROW WITH CARE</span>
+      <h1>今天，先记录眼前的一件事。</h1>
+      <p>把生长、筛查与就诊整理清楚，让每次随访都有据可讲。</p>
+    </div>
+    <div class="tiles">
+      <div class="tile"><span>记录整理进度</span><b>${checkedN}<small> / ${p.docs.length}</small></b><span class="tile-sub">份报告已入库</span></div>
+      <div class="tile"><span>当前阶段</span><b>${esc(stage.split('·')[0].trim())}</b><span class="tile-sub">${esc((stage.split('·')[1] || '').trim() || '只改话题，不做判断')}</span></div>
+    </div>
+  </div>
+  <div class="status-card">
+    <span class="eyebrow3">${esc(p.dash.anchorLabel)} · 状态卡 · 合成示例</span>
+    <div class="huge-line"><span class="huge">第 <b class="nowrap-num">${p.dash.anchorDays}</b> 天</span><span class="anchor-note">锚 ${esc(p.dash.anchorDate || '—')}（${p.id === 'demo1' ? '确诊日' : '上次复诊'} = 第 0 天）· 由档案日期算出，不手填</span></div>
+    <div class="sc-row">${pill(stage, 'green')}<span class="muted">下次：${esc(p.dash.nextVisit)}</span></div>
+    <div class="actions" style="margin-top:12px">${go('看生长轨迹 →', 'growth', 'overview', 'primary')}<button data-action="primer-open-proxy" class="soft">疾病概要：软骨发育不全是什么？</button></div>
   </div>
   <div class="action-band">
-    <div class="ab-text">复诊前把<b>生长轨迹、筛查结果、手术与用药</b>整理成一页带走；「下次该问什么」在就诊准备里。</div>
-    ${go('去就诊准备', 'visit', 'pack', 'primary')}
+    <div class="ab-text"><span class="ab-sentence">${deltaSentence}${w ? ` · 体重 <b class="nowrap-num">${esc(num(w.v))} kg</b>` : ''}</span><span class="ab-sub">${h ? `${esc(h.d)} ${esc(h.src || '')} 测量 · 已同步到一图秀；是否需要处理请与医疗团队讨论，工作台不做判断。` : '记录后会在这里显示最近变化。'}</span></div>
+    <div class="actions">${go('看生长趋势 →', 'growth', 'overview', 'primary')}${go('带去复诊的问题', 'visit', 'questions', 'soft')}</div>
   </div>
   <div class="quick-cards">
-    ${quick.map((q) => `<button class="quick-card" data-action="go" data-page="${q.page}" data-sub="${q.sub}"><span class="qc-icon" aria-hidden="true">${q.icon}</span><b>${esc(q.t)}</b><span>${esc(q.d)}</span><span class="qc-arrow" aria-hidden="true">→</span></button>`).join('')}
+    ${quick.map((q) => `<button class="quick-card" data-action="go" data-page="${q.page}" data-sub="${q.sub}"><span class="qc-icon" aria-hidden="true">${q.icon}</span><div><b>${esc(q.t)}</b><span>${esc(q.d)}</span></div><span class="qc-arrow" aria-hidden="true">↗</span></button>`).join('')}
+  </div>
+  <div class="two-col-dash">
+    <div>
+      <div class="sec-head"><div><h2>最近的变化</h2><p class="small-note">同一份记录，同时出现在一图秀、指标卡和就诊准备里。</p></div>${go('打开一图秀 ↗', 'growth', 'overview', 'text-button')}</div>
+      ${miniTrendCard('HEIGHT') || emptyBox('还没有身高记录', '从「记一次测量」开始，最近的变化会画在这里。', btn('＋ 记一次测量', 'form-measure', 'primary'))}
+    </div>
+    <div>
+      <div class="sec-head"><div><h2>接下来的安排</h2></div>${go('＋ 添加待问', 'visit', 'questions', 'text-button')}</div>
+      ${todoList()}
+    </div>
   </div>
   <div class="grid two" style="margin-top:14px">
     <div class="card"><h3>记录概况（当前档案）</h3>
@@ -263,7 +323,7 @@ function pageDash() {
       <p class="small-note" style="margin-top:6px">${esc(DATA.meta.screenNote)}</p>
       <div class="actions" style="margin-top:10px">${aiDiscuss('dash', '这页的口径说明适合带给医生看吗？')}</div>
     </div>
-  </div>`;
+  </div>`
 }
 
 /* ---------------- 一图秀（16 号合同；C 组） ---------------- */
@@ -321,45 +381,65 @@ function eventNodes(t0, t1) {
   return out.sort((a, b) => Date.parse(a.d) - Date.parse(b.d));
 }
 function renderChart() {
-  const [t0, t1] = domain();
-  const sel = (state.sel[state.profileId] || []).filter((c) => CATALOG[c]);
-  const series = sel.map((c) => seriesFor(c, t0, t1));
-  const evs = eventNodes(t0, t1);
-  const lanes = series.filter((s) => s.pts.length || s.all.length);
-  const evLane = evs.length || (state.layer.screening || state.layer.surgery || state.layer.injection);
-  const H = lanes.length * (LANE_H + LANE_GAP) + (evLane ? 64 : 16) + 46;
-  let out = '';
-  lanes.forEach((s, i) => {
-    const yBase = 40 + i * (LANE_H + LANE_GAP);
-    const y0 = yBase + 10, y1 = yBase + LANE_H - 6;
-    out += `<rect x="${CX0}" y="${yBase}" width="${CX1 - CX0}" height="${LANE_H}" rx="9" fill="#fafcf8" stroke="#e2e8de"/>`;
-    out += `<text x="${CX0 + 8}" y="${yBase + 14}" font-size="11" fill="#7c877b">${esc(s.m.name)}${s.m.unit ? '（' + esc(s.m.unit) + '）' : ''} · 全期 ${esc(num(s.lo))}–${esc(num(s.hi))} · 归一化显示，不可比</text>`;
-    const coords = s.pts.map((p) => ({ x: xOf(Date.parse(p.d), t0, t1), y: y1 - ((p.v - s.lo) / s.span) * (y1 - y0), d: p.d, v: p.v, src: p.src, org: p.org, note: p.note }));
-    /* C2：单点不连线（path 数 = 0，circle 数 = 1） */
-    if (coords.length > 1) out += `<path d="${smoothPath(coords)}" fill="none" stroke="${s.m.color}" stroke-width="2.4" stroke-linecap="round"/>`;
-    coords.forEach((c, j) => {
-      out += `<circle class="hit" data-point="${esc(s.code)}|${esc(c.d)}" cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4.2" fill="${s.m.color}" stroke="#fff" stroke-width="1.5" role="img" aria-label="${esc(s.m.name)} ${esc(num(c.v))}（${esc(c.d)}）"/>`;
-    });
-    /* C5：只标末点，每序列 1 个数值标签 */
-    if (coords.length) {
-      const last = coords[coords.length - 1];
-      out += `<text x="${Math.min(last.x + 7, CX1 - 44).toFixed(1)}" y="${(last.y - 7).toFixed(1)}" font-size="12" font-weight="600" fill="${s.m.color}">${esc(num(last.v))}</text>`;
+  const [t0, t1] = domain()
+  const sel = (state.sel[state.profileId] || []).filter((c) => CATALOG[c])
+  const series = sel.map((c) => seriesFor(c, t0, t1))
+  const evs = eventNodes(t0, t1)
+  const drawn = series.filter((x) => x.pts.length)
+  const W = CW, bandTop = 12, bandH = 66, plotTop = bandTop + bandH + 14, plotBottom = CH - 42
+  const CH2 = CH
+  let out = ''
+  /* --- 顶部事件期带（治疗条与数据点分层：带在上，线在下） --- */
+  out += `<text x="${CX0}" y="${bandTop + 2}" font-size="10" fill="#7c877b">事件</text>`
+  const rowY = { 手术: bandTop + 12, 筛查: bandTop + 30, 注射: bandTop + 48 }
+  out += `<line x1="${CX0}" x2="${CX1}" y1="${rowY.手术 - 6}" y2="${rowY.手术 - 6}" stroke="#e2e8de" stroke-dasharray="2 3"/>`
+  evs.forEach((e) => {
+    const x = xOf(Date.parse(e.d), t0, t1)
+    if (e.kind === '手术') {
+      out += `<rect class="hit" data-ev="${esc(e.kind)}|${esc(e.d)}|${esc(e.label)}" x="${(x - 4).toFixed(1)}" y="${(rowY.手术 - 4).toFixed(1)}" width="8" height="8" fill="#a2372a" transform="rotate(45 ${x.toFixed(1)} ${rowY.手术})" role="img" aria-label="手术：${esc(e.label)}（${esc(e.d)}）"/><text x="${(x + 8).toFixed(1)}" y="${(rowY.手术 + 3).toFixed(1)}" font-size="9.5" fill="#a2372a">${esc(e.label)} ${esc(e.d.slice(5))}</text>`
+    } else if (e.kind === '注射') {
+      out += `<rect class="hit" data-ev="${esc(e.kind)}|${esc(e.d)}|${esc(e.label)}" x="${(x - 3).toFixed(1)}" y="${rowY.注射 - 5}" width="6" height="10" rx="2" fill="#b06a2822" stroke="#b06a2866" role="img" aria-label="${esc(e.label)}"/>`
+    } else {
+      out += `<circle class="hit" data-ev="${esc(e.kind)}|${esc(e.d)}|${esc(e.label)}" cx="${x.toFixed(1)}" cy="${rowY.筛查}" r="3.2" fill="${e.color}" role="img" aria-label="${esc(e.kind)}：${esc(e.label)}（${esc(e.d)}）"/>`
     }
-  });
-  if (evLane) {
-    const yBase = 40 + lanes.length * (LANE_H + LANE_GAP);
-    out += `<rect x="${CX0}" y="${yBase}" width="${CX1 - CX0}" height="46" rx="9" fill="#fff" stroke="#e2e8de"/>`;
-    out += `<text x="${CX0 + 8}" y="${yBase + 14}" font-size="11" fill="#7c877b">事件（${esc(['筛查', '手术', '注射'].filter((k) => state.layer[{ 筛查: 'screening', 手术: 'surgery', 注射: 'injection' }[k]]).join(' / '))}）</text>`;
-    evs.forEach((e) => {
-      const x = xOf(Date.parse(e.d), t0, t1);
-      const y = yBase + 28 + (e.kind === '手术' ? -6 : e.kind === '筛查' ? 0 : 8);
-      out += `<rect class="hit" data-ev="${esc(e.kind)}|${esc(e.d)}|${esc(e.label)}" x="${(x - 4).toFixed(1)}" y="${(y - 4).toFixed(1)}" width="8" height="8" rx="2" fill="${e.color}" transform="rotate(45 ${x.toFixed(1)} ${y.toFixed(1)})" role="img" aria-label="${esc(e.kind)}：${esc(e.label)}（${esc(e.d)}）"/>`;
-    });
+  })
+  /* --- 锚点垂直虚线（确诊/建档锚点，小粉宝手术日同款） --- */
+  const anchorD = profile().dash?.anchorDate
+  if (anchorD && dOf(anchorD) && inDomain(anchorD, t0, t1)) {
+    const ax = xOf(Date.parse(anchorD), t0, t1)
+    out += `<line x1="${ax.toFixed(1)}" x2="${ax.toFixed(1)}" y1="${plotTop - 6}" y2="${plotBottom}" stroke="#c2ccbe" stroke-dasharray="3 4"/><text x="${Math.min(ax + 4, CX1 - 74).toFixed(1)}" y="${plotTop + 2}" font-size="9.5" fill="#7c877b">确诊 ${esc(anchorD.slice(5))}</text>`
   }
-  if (!lanes.length) out = `<text x="${CW / 2 - 60}" y="${CH / 2}" font-size="14" fill="#7c877b">没有所选指标（切换左栏勾选）</text>`;
-  const ticks = monthTicks(t0, t1);
-  ticks.forEach((t) => { const x = xOf(t.t, t0, t1); out += `<text x="${x.toFixed(1)}" y="${H - 10}" font-size="10.5" fill="#7c877b" text-anchor="middle">${esc(t.label)}</text>`; });
-  return { svg: `<svg class="chart" viewBox="0 0 ${CW} ${H}" role="img" aria-label="生长一图秀：${esc(lanes.map((s) => s.m.name).join('、') || '无所选指标')}">${out}</svg>`, lanes, series, evs };
+  /* --- 横向网格 --- */
+  for (let i = 1; i <= 3; i++) {
+    const gy = plotTop + (plotBottom - plotTop) * i / 4
+    out += `<line x1="${CX0}" x2="${CX1}" y1="${gy.toFixed(1)}" y2="${gy.toFixed(1)}" stroke="#eef2ea"/>`
+  }
+  /* --- 单区曲线：每条按自身全期 min/max 归一化（16 号合同） --- */
+  const endLabels = []
+  drawn.forEach((sx) => {
+    const coords = sx.pts.map((p) => ({ x: xOf(Date.parse(p.d), t0, t1), y: plotBottom - ((p.v - sx.lo) / sx.span) * (plotBottom - plotTop), d: p.d, v: p.v, src: p.src, org: p.org, note: p.note }))
+    if (coords.length > 1) out += `<path d="${smoothPath(coords)}" fill="none" stroke="${sx.m.color}" stroke-width="2.4" stroke-linecap="round"/>`
+    coords.forEach((c) => {
+      out += `<circle class="hit" data-point="${esc(sx.code)}|${esc(c.d)}" cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="4.2" fill="${sx.m.color}" stroke="#fff" stroke-width="1.5" role="img" aria-label="${esc(sx.m.name)} ${esc(num(c.v))}（${esc(c.d)}）"/>`
+    })
+    if (coords.length) {
+      const lastC = coords[coords.length - 1]
+      endLabels.push({ x: lastC.x, y: lastC.y - 7, text: num(lastC.v), color: sx.m.color })
+    }
+  })
+  /* 末点标签三向避让：按 y 排序，最小间距 14px，上下推开并夹回绘图区 */
+  endLabels.sort((a, b) => a.y - b.y)
+  for (let i = 1; i < endLabels.length; i++) if (endLabels[i].y - endLabels[i - 1].y < 14) endLabels[i].y = endLabels[i - 1].y + 14
+  const yMin = 70, yMax = CH - 44
+  endLabels.forEach((l) => { l.y = Math.min(yMax, Math.max(yMin, l.y)) })
+  endLabels.forEach((l) => {
+    out += `<text x="${(Math.min(l.x + 7, CX1 - 38)).toFixed(1)}" y="${l.y.toFixed(1)}" font-size="12" font-weight="600" fill="${l.color}">${esc(l.text)}</text>`
+  })
+  if (!drawn.length) out = `<text x="${CW / 2 - 78}" y="${CH2 / 2}" font-size="14" fill="#7c877b">没有所选指标（切换左栏勾选）</text>`
+  const ticks = monthTicks(t0, t1)
+  ticks.forEach((tk) => { const x = xOf(tk.t, t0, t1); out += `<text x="${x.toFixed(1)}" y="${CH2 - 14}" font-size="10.5" fill="#7c877b" text-anchor="middle">${esc(tk.label)}</text>` })
+  const svg = `<svg class="chart" viewBox="0 0 ${W} ${CH2}" role="img" aria-label="生长时间轴：${esc(drawn.map((x) => x.m.name).join('、') || '无所选指标')}">${out}</svg>`
+  return { svg, drawn, series, evs }
 }
 function monthTicks(t0, t1) {
   const out = []; const d = new Date(t0);
@@ -389,37 +469,61 @@ function chartPointDialog(code, d) {
     `${btn('更正这条记录', 'correct-measure', 'soft', `data-code="${esc(code)}" data-d="${esc(d)}"`)}<button data-action="close">关闭</button>`);
 }
 function railHtml() {
-  const sel = state.sel[state.profileId] || [];
-  const rangeBtn = (id, label) => `<button data-action="range" data-range="${id}" aria-pressed="${state.range === id}">${label}</button>`;
+  const sel = state.sel[state.profileId] || []
+  const rangeBtn = (id, label) => `<button data-action="range" data-range="${id}" aria-pressed="${state.range === id}">${label}</button>`
   const groups = CAT_ORDER.map((cat) => {
-    const keys = Object.keys(CATALOG).filter((k) => CATALOG[k].cat === cat);
+    const keys = Object.keys(CATALOG).filter((k) => CATALOG[k].cat === cat)
     const items = keys.map((k) => {
-      const on = sel.includes(k);
-      const last = lastOf(allMeasures(k));
-      return `<button class="metric-check" data-action="sel-metric" data-code="${k}" aria-pressed="${on}"><span class="dot" style="background:${CATALOG[k].color}"></span>${esc(CATALOG[k].name)}<span class="last">${last ? esc(num(last.v)) : '—'}</span></button>`;
-    }).join('');
-    return `<div><h3>${esc(cat)}</h3>${items}</div>`;
-  }).join('');
-  const layerBtn = (id, label) => `<button data-action="layer" data-layer="${id}" aria-pressed="${state.layer[id]}">${label}</button>`;
+      const on = sel.includes(k)
+      const last = lastOf(allMeasures(k))
+      return `<button class="metric-check" data-action="sel-metric" data-code="${k}" aria-pressed="${on}"><span class="box" aria-hidden="true"></span><span class="dot" style="background:${CATALOG[k].color}"></span>${esc(CATALOG[k].name)}<span class="last">${last ? esc(num(last.v)) : '—'}</span></button>`
+    }).join('')
+    return `<div><h3>${esc(cat)}</h3>${items}</div>`
+  }).join('')
+  const layerBtn = (id, label) => `<button data-action="layer" data-layer="${id}" aria-pressed="${state.layer[id]}">${label}</button>`
   return `<aside class="rail" aria-label="一图秀控制栏">
     <div><h3>时间范围</h3><div class="chip-row">${rangeBtn('all', '全部')}${rangeBtn('3m', '近 3 月')}${rangeBtn('6m', '近 6 月')}${rangeBtn('12m', '近 12 月')}</div></div>
-    <div><h3>选择指标（最多 4 条）</h3>${groups}<p class="chart-note">超出 4 条时先取消已选；每项色点=图内颜色。</p></div>
-    <div><h3>显示内容</h3><div class="chip-row">${layerBtn('screening', '筛查节点')}${layerBtn('surgery', '手术')}${layerBtn('injection', '注射（按月汇总）')}</div></div>
+    <div><h3>选择指标 <span class="rail-hint">最多 4 个 · 已选 ${sel.length}</span></h3>${groups}<p class="chart-note">共 ${Object.keys(CATALOG).length} 项 · 点选后图表立即更新。</p></div>
+    <div><h3>显示内容</h3><div class="chip-row">${layerBtn('screening', '筛查节点')}${layerBtn('surgery', '手术')}${layerBtn('injection', '注射（按月）')}</div></div>
     <p class="chart-note">${esc(DATA.meta.growthNote)}</p>
-  </aside>`;
+  </aside>`
 }
 function pageGrowthOverview() {
-  const { svg } = renderChart();
+  const { svg, drawn, evs } = renderChart()
+  const [t0, t1] = domain()
+  const fmt = (t) => { const d = new Date(t); return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}` }
+  const legend = drawn.map((sx) => `<span class="lg"><span class="dot" style="background:${sx.m.color}"></span>${esc(sx.m.name)} <b>${esc(num(sx.pts.at(-1).v))}</b>${sx.m.unit ? ' ' + esc(sx.m.unit) : ''} <span class="muted">全期 ${esc(num(sx.lo))}–${esc(num(sx.hi))}</span></span>`).join('')
+  const evLegend = ['手术', '筛查', '注射']
+  const evOn = evLegend.filter((k) => state.layer[{ 手术: 'surgery', 筛查: 'screening', 注射: 'injection' }[k]])
+  const pills = `<span class="pill green">${drawn.length} 个指标</span><span class="pill grey">仅已入库记录</span>`
   return `<div class="chart-layout">${railHtml()}
-    <div class="chart-card">${svg}
-      <div class="legend-row">${(state.sel[state.profileId] || []).map((c) => `<span><span class="dot" style="background:${CATALOG[c]?.color}"></span>${esc(CATALOG[c]?.name || c)}</span>`).join('') || '<span>未选指标</span>'}</div>
-      <p class="chart-note">每条序列按该指标全期范围归一化（min–max），各条带高度一致；不同指标、不同方法、不同机构之间<b>不可比</b>。点数据点看原始来源。</p>
+    <div class="chart-card">
+      <div class="chart-head"><div><h2 class="chart-title">生长时间轴</h2><p class="chart-sub">${esc(fmt(t0))} — ${esc(fmt(t1))} · 全部已入库的演示记录（合成示例）</p></div><div class="chart-pills">${pills}</div></div>
+      <div class="legend-line">${legend || '<span class="muted">未选指标</span>'}</div>
+      ${svg}
+      <p class="chart-note">↑ 每条线按该指标全部记录范围缩放（min–max），不代表不同指标数值可比；点曲线上的记录点，可查看数值、日期与来源。</p>
+      <div class="ev-legend">${evOn.map((k) => `<span class="lg"><span class="sq ${k === '手术' ? 'sq-rose' : k === '筛查' ? 'sq-teal' : 'sq-amber'}"></span>${k}</span>`).join('') || '<span class="muted">事件层全部关闭</span>'} <span class="muted">· 共 ${evs.length} 个事件在带内</span></div>
       <div class="actions" style="margin-top:10px">${aiBtn('growth')}${aiDiscuss('growth', '这张图适合怎么跟医生讲？')}</div>
     </div>
-  </div>`;
+  </div>`
 }
 
-/* ---------------- 指标卡（MT 组：真 3D 翻转，定高 194px） ---------------- */
+/* ---------------- 指标卡（MT 组：真 3D 翻转，定高 194px；背面=最近几次迷你折线，小粉宝同款） ---------------- */
+function sparkline(pts, color, dec) {
+  const w = 220, h = 62, pad = 7
+  const vals = pts.map((x) => x.v)
+  const lo = Math.min(...vals), hi = Math.max(...vals)
+  const span = hi - lo || Math.max(Math.abs(hi) * .08, 1)
+  const coords = pts.map((x, i) => ({ x: pad + i * (w - pad * 2) / Math.max(pts.length - 1, 1), y: h - 12 - (x.v - lo) / span * (h - 24) }))
+  const path = pts.length > 1 ? smoothPath(coords) : ''
+  const last = coords[coords.length - 1]
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" role="img" aria-label="最近 ${pts.length} 次记录折线">
+    <line class="base" x1="${pad}" x2="${w - pad}" y1="${h - 12}" y2="${h - 12}"/>
+    ${path ? `<path class="sp-line" d="${path}" stroke="${color}" pathLength="1" fill="none"/>` : ''}
+    ${coords.map((c, i) => `<circle class="sp-dot" cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${i === coords.length - 1 ? 3.6 : 2.6}" fill="${color}"/>`).join('')}
+    <text x="${Math.min(last.x, w - 24).toFixed(1)}" y="${Math.max(last.y - 8, 10).toFixed(1)}" text-anchor="middle" font-size="9.5" fill="${color}" font-weight="600">${esc(num(pts[pts.length - 1].v, dec))}</text>
+  </svg>`
+}
 function mcard(code) {
   const m = CATALOG[code];
   const arr = allMeasures(code);
@@ -427,17 +531,27 @@ function mcard(code) {
   const delta = last && prev && dOf(last.d) && dOf(prev.d) ? (last.v - prev.v) : null;
   const nCount = arr.length;
   const front = `<div class="mface">
-    <div class="m-top"><span class="m-cat">${esc(m.cat)}</span>${pill(m.unit ? m.unit : '口径待核', 'grey')}</div>
-    <div style="margin-top:6px"><b style="font-size:14px">${esc(m.name)}</b></div>
+    <div class="m-top"><span class="m-cat"><i style="background:${m.color}"></i>${esc(m.cat)}</span>${pill(m.unit ? m.unit : '口径待核', 'grey')}</div>
+    <div class="m-name">${esc(m.name)}</div>
     <div class="m-value">${last ? esc(num(last.v, m.dec)) + (m.unit ? `<small>${esc(m.unit)}</small>` : '') : '<span style="font-size:15px;color:var(--muted);font-weight:500">暂无测量</span>'}</div>
-    <div class="m-delta">${last ? (delta === null ? '仅 1 条记录，无「较上次」' : `较上次 ${delta > 0 ? '+' : ''}${esc(num(delta, m.dec))}${m.unit ? ' ' + esc(m.unit) : ''}（${esc(prev.d)} → ${esc(last.d)}）`) : '记录后会在这里显示'}</div>
-    <div class="m-src">${last ? `${esc(last.d)} · ${esc(last.src || '来源未记录')} · 共 ${nCount} 条` : '来源与机构在记录时填写'}</div>
+    <div class="m-delta">${last ? (delta === null ? '首次记录，无「较上次」' : `较上次 ${delta > 0 ? '+' : ''}${esc(num(delta, m.dec))}${m.unit ? ' ' + esc(m.unit) : ''}（${esc(prev.d)} → ${esc(last.d)}）`) : '记录后会在这里显示'}</div>
+    <div class="m-src"><span>${last ? `${esc(last.d)} · ${esc(last.src || '来源未记录')} · 共 ${nCount} 条` : '来源与机构在记录时填写'}</span><span class="hint">翻转 ↗</span></div>
   </div>`;
-  const back = `<div class="mface back">
-    <div class="m-top"><span class="m-cat">口径说明</span>${pill('仅回顾 · 不解读', 'grey')}</div>
-    <p class="m-note" style="margin-top:8px">${esc(m.note)}</p>
-    <p class="m-note" style="margin-top:6px">${esc(DATA.meta.growthNote)}</p>
-    <div class="m-src">背面不设操作；再点一次翻回正面。</div>
+  const dated = arr.filter((x) => dOf(x.d))
+  const back = dated.length > 1
+    ? `<div class="mface back">
+    <div class="m-top"><span class="m-cat"><i style="background:${m.color}"></i>${esc(m.cat)}</span>${pill('仅回顾 · 不解读', 'grey')}</div>
+    <div class="m-name">${esc(m.name)} · 最近 ${dated.length} 次</div>
+    ${sparkline(dated, m.color, m.dec)}
+    <div class="spark-labels"><span>${esc(dated[0].d)}</span><span>${esc(dated[dated.length - 1].d)}</span></div>
+    <div class="m-src">仅回顾已入库记录 · 再点一次翻回正面。</div>
+  </div>`
+    : `<div class="mface back">
+    <div class="m-top"><span class="m-cat"><i style="background:${m.color}"></i>${esc(m.cat)}</span>${pill('仅回顾 · 不解读', 'grey')}</div>
+    <div class="m-name">${esc(m.name)}</div>
+    <p class="m-note" style="margin-top:8px">${dated.length === 1 ? '只有 1 次带日期的记录，暂不连线。再记录一次后显示趋势。' : '还没有带日期的记录，暂不连线。'}</p>
+    <p class="m-note" style="margin-top:6px">${esc(m.note)}</p>
+    <div class="m-src">再点一次翻回正面。</div>
   </div>`;
   return `<button class="mcard" data-action="flip" data-code="${code}" aria-pressed="false" aria-label="${esc(m.name)}指标卡，翻面看口径">
     <span class="mcard-inner">${front}${back}</span>
@@ -1167,6 +1281,7 @@ document.addEventListener('click', (e) => {
     case 'use-profile': useProfile(t.dataset.id); break;
     case 'settings': openSettings('ws'); break;
     case 'cfg-tab': openSettings(t.dataset.tab); break;
+    case 'primer-open-proxy': document.querySelector('[data-primer-open]')?.click(); break;
     case 'open-store': openModal('资料目录', '<p class="small-note">原型演示：装机后由 DSH 宿主指定业务资料目录（config.root = dshHomePath(\'achondroplasia\')），目录拒绝主目录/桌面/下载根。</p>'); break;
     case 'about': openModal(`关于 ${APP_INFO.name}`, `<p style="font-size:13.5px">版本 <b>${APP_INFO.version}</b>（构建 ${APP_INFO.build}）<br>软骨发育不全患儿家庭工作台 · 交互原型<br>全部数据为合成示例；本页未接入 DSH 宿主与 AI。</p>`); break;
     case 'help': openModal('原型操作说明', '<p style="font-size:13.5px">· 左侧切换 6 条一级线；页内页签在各页顶部。<br>· 顶栏「?」打开疾病概要（整页）。<br>· 「AI 协助 ↗」为 achondroplasia:agent-draft 协议链接（34 号）：嵌入式直接发送；独立打开走演示面板。<br>· 侧栏上方切换 A/B 演示档案。<br>· 所有数据为合成示例；刷新重置。</p>'); break;

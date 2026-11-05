@@ -117,12 +117,12 @@ async function main() {
   const c2 = await page.evaluate(() => {
     const app = window.__ACH_APP__
     app.useProfile('demo2'); app.state.sel.demo2 = ['BMIW']; app.state.range = 'all'; app.render()
-    const pathN = document.querySelectorAll('svg.chart path').length
-    const circN = document.querySelectorAll('svg.chart circle').length
+    const pathN = [...document.querySelectorAll('svg.chart path')].filter((x) => x.getAttribute('d')?.startsWith('M')).length
+    const circN = [...document.querySelectorAll('svg.chart circle')].filter((x) => x.dataset.point).length
     app.state.sel.demo2 = ['HEIGHT', 'WEIGHT', 'HEAD']; app.render()
     return { pathN, circN }
   })
-  t('C2', '单点序列不连线（path=0、circle=1）', c2.pathN === 0 && c2.circN === 1, c2)
+  t('C2', '单点序列不连线（数据 path=0、数据点 circle=1；事件带另计）', c2.pathN === 0 && c2.circN === 1, c2)
 
   const c3 = await page.evaluate(() => {
     const app = window.__ACH_APP__
