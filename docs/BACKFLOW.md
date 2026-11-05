@@ -29,6 +29,14 @@
 | 13 | 本仓 app.js | apiSaveRecord keepOpen 贯通（F3）、医院修改=新版本+历史接口（F6）、一图秀私密 N 条不含+measure 可见性开关+图表过滤（D5）、检索地区维度（E2，0005 迁移）、家庭沟通记录卡+表单（F2）、MinerU 替换 Token 禁用态（C3）、声明条版本字面（A4）、菜单裁剪表（B1） | 修复 |
 | 14 | starter 候选（未回流） | 「分组属性拍平 3D」探针加固：断言 .mcard-inner 无 overflow/clip-path/filter/mask（L64 的可断言化） | 待实施 |
 
+## 第四轮回流（2026-11-06 用户点名追查轮：AI/设置/首页/一图秀）
+
+| # | 去向 | 内容 | 类型 |
+| --- | --- | --- | --- |
+| 15 | 本仓 app.js | AI 每页单一入口（三页重复实测 2 个→1 个，统一「和 AI 讨论」IP11 文案） | 修复 |
+| 16 | 本仓 app.js | 设置三 Tab 状态保持：openSettings 默认参数 null（弹窗默认参数重置状态的通用坑→starter L65） | 修复+可复用教训 |
+| 17 | 本仓 index.html | AI 面板 demo 内容中性化（去硬编码档案名假对话） | 修复 |
+
 ## 检查器待实施清单（追加；谁能断言谁写）
 
 1. probe-one-chart 本仓已覆盖 C1–C6/C4 路径断言（probe-ach-m2），家族级 `templates/probe-one-chart.mjs` 仍待抽象（对照小粉宝口径：getBBox 高度比、翻转 rect 四值、matrix3d 前缀）。

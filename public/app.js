@@ -199,8 +199,7 @@ const aiPromptWithCtx = (key) => `${AI_DEMOS[key]?.prompt || '帮我整理这一
 const btn = (text, action, cls = '', attr = '') => `<button class="${cls}" data-action="${action}" ${attr}>${text}</button>`;
 const go = (text, page, sub = '', cls = '', attr = '') => btn(text, 'go', cls, `data-page="${page}" data-sub="${esc(sub)}"${attr ? ' ' + attr : ''}`);
 const pill = (text, cls = '') => `<span class="pill ${cls}">${esc(text)}</span>`;
-const aiBtn = (key, label = 'AI 协助') => `<a class="chip ai-link" href="achondroplasia:agent-draft?prompt=${encodeURIComponent(aiPromptWithCtx(key))}" data-ai="${key}" title="把预写提示词与当前档案上下文发送给 AI，开启互动（回复是候选，核对后采纳）">${esc(label)} ↗</a>`;
-const aiDiscuss = (key, what) => `<a class="chip ai-link" href="achondroplasia:agent-draft?prompt=${encodeURIComponent(`和 AI 讨论：${what}\n（已确认的档案上下文：${aiCtx()}）`)}" data-ai="${key}" title="和 AI 讨论这一页（草稿只填不发）">和 AI 讨论 ↗</a>`;
+const aiBtn = (key, label = '和 AI 讨论') => `<a class="chip ai-link" href="achondroplasia:agent-draft?prompt=${encodeURIComponent(aiPromptWithCtx(key))}" data-ai="${key}" title="把预写提示词与当前档案上下文发送给 AI，开启互动（回复是候选，核对后采纳）">${esc(label)} ↗</a>`;
 function toast(t, opts = {}) {
   clearTimeout(state.toastTimer);
   const el = $('#toast'); el.textContent = t; el.classList.add('show');
@@ -339,7 +338,6 @@ function pageDash() {
       <p class="small-note" style="margin-top:6px">${esc(DATA.meta.growthNote)}</p>
       <p class="small-note" style="margin-top:6px">${esc(DATA.meta.metricNote)}</p>
       <p class="small-note" style="margin-top:6px">${esc(DATA.meta.screenNote)}</p>
-      <div class="actions" style="margin-top:10px">${aiDiscuss('dash', '这页的口径说明适合带给医生看吗？')}</div>
     </div>
   </div>`
 }
@@ -522,7 +520,7 @@ function pageGrowthOverview() {
       ${svg}
       <p class="chart-note">↑ 每条线按该指标全部记录范围缩放（min–max），不代表不同指标数值可比；点曲线上的记录点，可查看数值、日期与来源。</p>
       <div class="ev-legend">${evOn.map((k) => `<span class="lg"><span class="sq ${k === '手术' ? 'sq-rose' : k === '筛查' ? 'sq-teal' : 'sq-amber'}"></span>${k}</span>`).join('') || '<span class="muted">事件层全部关闭</span>'} <span class="muted">· 共 ${evs.length} 个事件在带内</span></div>
-      <div class="actions" style="margin-top:10px">${aiBtn('growth')}${aiDiscuss('growth', '这张图适合怎么跟医生讲？')}</div>
+      <div class="actions" style="margin-top:10px">${aiBtn('growth')}</div>
     </div>
   </div>`
 }
@@ -675,7 +673,7 @@ function pageEventsTimeline() {
     ...allSurgeries().map((s) => ({ d: s.d, kind: '手术', color: '#a2372a', label: s.name, src: '医生原话见手术档案' })),
     ...(p.events?.meds || []).filter((m) => m.start).map((m) => ({ d: m.start, kind: '用药开始', color: '#b06a28', label: `${m.drug}：${m.status}` }))
   ].filter((r) => dOf(r.d)).sort((a, b) => a.d.localeCompare(b.d));
-  return head('时间线', '按日期并列发生过的评估、筛查、手术与用药开始；缺日期的记录不入时间线（如实留白）。', `${aiBtn('events')}${aiDiscuss('events', '这条时间线讲得清吗？')}`) +
+  return head('时间线', '按日期并列发生过的评估、筛查、手术与用药开始；缺日期的记录不入时间线（如实留白）。', `${aiBtn('events')}`) +
     (rows.length ? `<div class="table-wrap"><table><thead><tr><th>日期</th><th>类型</th><th>内容</th><th>来源</th></tr></thead><tbody>
       ${rows.map((r) => `<tr><td class="nowrap-num">${esc(r.d)}</td><td><span class="pill" style="background:${r.color}1a;color:${r.color}">${esc(r.kind)}</span></td><td>${esc(r.label)}</td><td>${esc(r.src || '—')}</td></tr>`).join('')}
     </tbody></table><div class="scroll-hint">← 表格可横向滚动 →</div></div>` : emptyBox('暂无带日期的事件', '录入手术或用药开始后自动出现在时间线。')) +
@@ -981,6 +979,8 @@ const CFG_TABS = [
   { id: 'mineru', label: '文档解析（MinerU）' },
   { id: 'clinic', label: '临床数据库' }
 ];
+/* 设置弹窗的状态在切换 tab 间保持（C1：切换互不丢状态） */
+const cfgState = { tab: 'ws', consent: false };
 function settingsBody(tab) {
   if (tab === 'ws') return `<div class="card"><h3>业务资料根目录（示意）</h3><p class="small-note" style="margin-top:4px">示意值：~/<b>由 DSH 宿主指定</b>/achondroplasia（装机后由宿主按 slug 隔离）</p>
     <div class="actions" style="margin-top:8px">${btn('更改位置（装机后可用）', 'noop-disabled', 'soft', 'disabled')} </div>
@@ -991,9 +991,9 @@ function settingsBody(tab) {
     </div>
     <p class="small-note" style="margin-top:10px">口径：资料目录<b>拒绝主目录/桌面/下载根</b>；备份与恢复行装机后可用。</p></div>`;
   if (tab === 'mineru') return `<div class="notice">未勾选同意前：<b>不会上传、不会调用</b>任何解析服务。</div>
-    <div class="card" style="margin-top:10px"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" style="width:auto;margin-top:3px" data-mu-consent>我已了解：勾选并保存<b>仅在本机记录同意状态，不联网</b>（本仓未接入 MinerU）。</label>
+    <div class="card" style="margin-top:10px"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" style="width:auto;margin-top:3px" data-mu-consent ${cfgState.consent ? 'checked' : ''}>我已了解：勾选并保存<b>仅在本机记录同意状态，不联网</b>（本仓未接入 MinerU）。</label>
     <div class="form-grid" style="margin-top:10px"><label>API Token（掩码，只显后 4 位）<input value="••••••••••••ab3f" disabled></label>
-    <label>替换 Token（未勾选同意前禁用）<input data-mu-replace placeholder="粘贴新 Token（jm_开头）" disabled></label>
+    <label>替换 Token（未勾选同意前禁用）<input data-mu-replace placeholder="粘贴新 Token（jm_开头）" ${cfgState.consent ? '' : 'disabled'}></label>
     <label>解析模型<input value="pipeline（固定；不可切 VLM——长报告成本与隐私考虑，官方口径）" disabled></label></div>
     <p class="small-note" style="margin-top:8px">Flash 免费额度：单文件 ≤10 MB / ≤20 页；超出自动降级为占位解析（如实提示，不假装解析成功）。</p>
     <p class="small-note" style="margin-top:4px">如何申请：① 打开 MinerU 控制台 → ② 创建 API Token → ③ 复制粘贴到上面 → ④ 保存并测试。</p>
@@ -1005,8 +1005,9 @@ function settingsBody(tab) {
       <dt>断网口径</dt><dd>断网时临床页显示「快照不可用」，不假装零结果</dd>
     </dl><p class="small-note" style="margin-top:8px">${esc(DATA.meta.trialNote)}</p></div>`;
 }
-function openSettings(tab = 'ws') {
-  openModal('设置', `<div class="subnav" role="tablist" aria-label="设置页签">${CFG_TABS.map((t) => `<button role="tab" aria-selected="${tab === t.id}" data-action="cfg-tab" data-tab="${t.id}">${t.label}</button>`).join('')}</div>${settingsBody(tab)}`, '<button data-action="close">关闭</button>', '小苗宝 · 设置');
+function openSettings(tab = null) { /* 无参=保持当前 tab（C1 状态保持） */
+  if (tab) cfgState.tab = tab
+  openModal('设置', `<div class="subnav" role="tablist" aria-label="设置页签">${CFG_TABS.map((t) => `<button role="tab" aria-selected="${cfgState.tab === t.id}" data-action="cfg-tab" data-tab="${t.id}">${t.label}</button>`).join('')}</div>${settingsBody(cfgState.tab)}`, '<button data-action="close">关闭</button>', '小苗宝 · 设置');
 }
 
 /* ---------------- 整页视图（32 号：history 是导航栈唯一真源） ---------------- */
@@ -1328,8 +1329,8 @@ document.addEventListener('click', (e) => {
     case 'go': goHash(t.dataset.page, t.dataset.sub); break;
     case 'profiles': openProfiles(); break;
     case 'use-profile': useProfile(t.dataset.id); break;
-    case 'settings': openSettings('ws'); break;
-    case 'cfg-tab': openSettings(t.dataset.tab); break;
+    case 'settings': openSettings(); break;
+    case 'cfg-tab': cfgState.tab = t.dataset.tab; openSettings(); break;
     case 'primer-open-proxy': document.querySelector('[data-primer-open]')?.click(); break;
     case 'open-store': openModal('资料目录', '<p class="small-note">原型演示：装机后由 DSH 宿主指定业务资料目录（config.root = dshHomePath(\'achondroplasia\')），目录拒绝主目录/桌面/下载根。</p>'); break;
     case 'about': openModal(`关于 ${APP_INFO.name}`, `<p style="font-size:13.5px">版本 <b>${APP_INFO.version}</b>（构建 ${APP_INFO.build}）<br>软骨发育不全患儿家庭工作台 · 交互原型<br>全部数据为合成示例；本页未接入 DSH 宿主与 AI。</p>`); break;
@@ -1406,6 +1407,12 @@ document.addEventListener('click', (e) => {
   }
 });
 document.addEventListener('change', (e) => {
+  if (e.target.matches('[data-mu-consent]')) {
+    cfgState.consent = e.target.checked
+    const rep = document.querySelector('[data-mu-replace]')
+    if (rep) rep.disabled = !cfgState.consent
+    return
+  }
   const ss = e.target.closest('[data-saved-state]');
   if (ss) { const s = mem().savedTrials.find((x) => x.key === ss.dataset.key); if (s) s.state = ss.value; toast('跟进状态已更新（只存本机）'); }
 });
