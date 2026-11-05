@@ -251,6 +251,39 @@ async function main() {
   const aiAllPages = Object.values(aiLinks).every((n) => n >= 1)
   t('Q14/IP10', '每个一级页有 achondroplasia:agent-draft 链接', aiAllPages, aiLinks)
 
+  /* ---------- E5：试验详情右侧浮窗（非居中弹窗、三关闭口、不改 hash、焦点恢复） ---------- */
+  /* 真鼠标路径（程序化 click 不给焦点——A4b 同款教训）：打开→量浮窗→点遮罩关→焦点回触发卡 */
+  const openBtn = await page.evaluate(() => {
+    const app = window.__ACH_APP__
+    app.state.page = 'trial'; app.state.sub.trial = 'match'; app.render()
+    const b = [...document.querySelectorAll('#main button')].find((x) => x.textContent.includes('看逐条判据'))
+    if (!b) return null
+    b.scrollIntoView({ block: 'center' })
+    const r = b.getBoundingClientRect()
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+  })
+  if (!openBtn) { t('E5', '试验详情浮窗', false, '找不到判据按钮'); }
+  else {
+    await page.mouse.click(openBtn.x, openBtn.y)
+    await page.waitForSelector('.trial-pane', { timeout: 3000 })
+    const paneInfo = await page.evaluate(() => {
+      const pane = document.querySelector('.trial-pane')
+      const r = pane.getBoundingClientRect()
+      return { isSide: r.left >= innerWidth / 2, focusIn: pane.contains(document.activeElement), hasMask: !!document.querySelector('.trial-mask'), hasX: !!pane.querySelector('[data-tp="close"]'), hash: location.hash }
+    })
+    const maskBox = await page.evaluate(() => { const m = document.querySelector('.trial-mask').getBoundingClientRect(); return { x: m.x + 40, y: m.y + 40 } })
+    await page.mouse.click(maskBox.x, maskBox.y)
+    await page.waitForFunction(() => !document.querySelector('.trial-pane'), { timeout: 3000 }).catch(() => {})
+    const closedInfo = await page.evaluate(() => ({ closed: !document.querySelector('.trial-pane'), focusBack: document.activeElement?.textContent?.includes('看逐条判据'), hash: location.hash }))
+    /* Esc 口：重开一次用键盘关 */
+    await page.mouse.click(openBtn.x, openBtn.y)
+    await page.waitForSelector('.trial-pane', { timeout: 3000 })
+    await page.keyboard.press('Escape')
+    await page.waitForFunction(() => !document.querySelector('.trial-pane'), { timeout: 3000 }).catch(() => {})
+    const escClosed = await page.evaluate((h) => !document.querySelector('.trial-pane') && location.hash === h, closedInfo.hash)
+    t('E5', '试验详情=右侧浮窗：遮罩/✕/Esc 三口、不改 hash、关闭焦点回触发卡', paneInfo.isSide && paneInfo.focusIn && paneInfo.hasMask && paneInfo.hasX && closedInfo.closed && closedInfo.focusBack && paneInfo.hash === closedInfo.hash && escClosed, { pane: paneInfo, close: closedInfo, esc: escClosed })
+  }
+
   /* ---------- 页面 JS 错误 ---------- */
   t('ERR', '无未捕获页面错误', errors.length === 0, errors.slice(0, 3))
 

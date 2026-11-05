@@ -5,7 +5,7 @@ window.DISEASE_PRIMER = {
   brand: '小苗宝 GrowPal',
   name: '软骨发育不全',
   en: 'Achondroplasia',
-  updated: '2026-11-06（夜间整理 · 未经临床审核）',
+  updated: '2026-11-06（夜间整理 · 0 患者访谈 · 0 临床审核 · 据二次来源）',
   sections: [
     {
       id: 'definition',

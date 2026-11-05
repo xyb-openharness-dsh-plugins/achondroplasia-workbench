@@ -84,8 +84,8 @@ const state = {
   pin: null,
   pv: null,
   mem: {
-    demo1: { measures: [], screenings: [], surgeries: [], injections: [], corrections: [], savedTrials: [], acceptedCands: [], questions: null },
-    demo2: { measures: [], screenings: [], surgeries: [], injections: [], corrections: [], savedTrials: [], acceptedCands: [], questions: null }
+    demo1: { measures: [], screenings: [], surgeries: [], injections: [], corrections: [], savedTrials: [], acceptedCands: [], questions: null, hospitals: [] },
+    demo2: { measures: [], screenings: [], surgeries: [], injections: [], corrections: [], savedTrials: [], acceptedCands: [], questions: null, hospitals: [] }
   },
   trialFilter: { q: '', status: 'all', phase: 'all', sort: 'status' },
   agent: { open: false },
@@ -426,7 +426,7 @@ function candRow(c) {
   return `<div class="cand-row"><div class="cand-main"><b style="font-size:13.5px">${esc(c.title)}</b>
     <dl class="kv" style="margin-top:6px">${c.fields.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
     <p class="small-note" style="margin-top:5px">来源：${esc(c.src)}</p></div>
-    <div class="actions">${accepted ? pill('已核对入库', 'green') + btn('撤销待定？不：拒收=零副作用，见说明', 'noop-disabled', 'text-button', 'disabled') : btn('核对入库', 'accept-cand', 'primary', `data-cand="${esc(c.id)}"`)}</div>
+    <div class="actions">${accepted ? pill('已核对入库', 'green') : btn('核对入库', 'accept-cand', 'primary', `data-cand="${esc(c.id)}"`)}</div>
     ${accepted ? '' : `<div class="actions">${btn('拒收', 'reject-cand', 'soft', `data-cand="${esc(c.id)}"`)}</div>`}
   </div>`;
 }
@@ -438,7 +438,7 @@ function pageGrowthCands() {
 }
 function pageGrowthDocs() {
   const docs = profile().docs || [];
-  return head('报告档案', '报告原件与整理状态；无原件的条目如实标注「无原件」。', aiBtn('growth')) +
+  return head('报告档案', '报告原件与整理状态；无原件的条目如实标注「无原件」。', `${btn('＋ 登记报告', 'form-doc', 'primary')}${aiBtn('growth')}`) +
     `<div class="table-wrap"><table>
       <thead><tr><th>材料</th><th>日期</th><th>类型</th><th>整理状态</th><th>原件</th></tr></thead>
       <tbody>${docs.map((d) => `<tr><td>${esc(d.name)}</td><td class="nowrap-num">${esc(d.date)}</td><td>${esc(d.type)}</td><td>${d.status === '已入库' ? pill('已入库', 'green') : d.status === '已解析' ? pill('已解析', 'yellow') : pill('待核对', 'grey')}</td><td>${d.hasOriginal ? pill('有原件', 'green') : pill('无原件（据二次来源）', 'yellow')}</td></tr>`).join('')}</tbody>
@@ -596,7 +596,13 @@ function pageVisitPack() {
       </dl></div>
       <div class="card"><h3>怎么用</h3><p class="small-note" style="margin-top:6px">1. 复诊前点「生成资料包预览」整页检查；2. 需要时下载 .md 或截图；3. 报告原件另带。口头版可用「AI 协助」起草（候选需核对）。</p>
       <p class="small-note" style="margin-top:6px">${esc(DATA.meta.privateNote)}</p></div>
-    </div>`;
+    </div>` + hospitalsBlock();
+}
+function hospitalsBlock() {
+  const base = profile().hospitals || [];
+  const list = [...base, ...(mem().hospitals || [])];
+  return `<div class="section-title"><div><span class="eyebrow">就医信息</span><h2>就诊医院（支持多家）</h2><p>逐条卡片；联系方式可填电话或「见病历出处」。</p></div>${btn('＋ 登记医院', 'form-hospital', 'primary')}</div>
+    ${list.length ? `<div class="grid two">${list.map((h) => `<div class="card"><h3>${esc(h.name)}</h3><dl class="kv" style="margin-top:6px"><dt>科室</dt><dd>${esc(h.dept || '未记录')}</dd><dt>联系</dt><dd>${esc(h.contact || '见病历出处')}</dd>${h.version > 1 ? `<dt>版本</dt><dd>v${h.version}（更正=新版本）</dd>` : ''}</dl></div>`).join('')}</div>` : emptyBox('还没有登记医院', '把常去的医院与科室记下来，复诊安排不乱。', btn('＋ 登记医院', 'form-hospital', 'primary'))}`;
 }
 function pageVisitQuestions() {
   const qs = allQuestions();
@@ -613,10 +619,14 @@ function pageVisit() {
 }
 
 /* ---------------- 临床试验（35 号四段链路；E 组红线） ---------------- */
+function ageMonthsOf(p) { /* 从档案 ageLabel 解析（27 月龄 / 80 月龄），防数据改动后判据失真 */
+  const m = String(p.ageLabel || '').match(/(\d+)\s*月龄/);
+  return m ? Number(m[1]) : null;
+}
 function trialCriteria(t) {
   const p = profile();
-  const ageMonths = p.id === 'demo1' ? 27 : 80;
-  const ageYears = ageMonths / 12;
+  const ageMonths = ageMonthsOf(p);
+  const ageYears = ageMonths === null ? NaN : ageMonths / 12;
   const rows = [];
   rows.push({ cat: '诊断', hard: true, ok: true, mine: '确诊档案：FGFR3 c.1138G>A（基因报告 2026-08-01，演示）', req: t.requiresDiagnosis });
   const ageOk = ageYears >= t.ageMin && ageYears <= t.ageMax;
@@ -661,10 +671,57 @@ function pageTrialMatch() {
       </details>
     </div>`;
   }).join('');
+  const ageM = ageMonthsOf(profile());
+  const fields = [
+    ['诊断', '确诊档案：基因报告 2026-08-01（已核对入库）', '已入库'],
+    ['年龄段', `档案属性：${esc(profile().age)}（${ageM === null ? '未记录' : ageM + ' 月龄'}）`, '已入库'],
+    ['骨骺状态', '未记录（待确认；对照需以检查为准）', '未记录'],
+    ['活动能力（部分登记需要）', '未记录步态评估', '未记录']
+  ];
+  const prefs = ['优先「招募中」', '优先离家近的中心'];
+  const hardPills = (rows) => rows.filter((r) => r.hard).map((r) => `<span class="pill ${r.ok === true ? 'green' : r.ok === false ? 'rose' : 'yellow'}">${r.ok === true ? '✓' : r.ok === false ? '✕' : '?'} ${esc(r.cat)}</span>`).join(' ');
+  const cards2 = trials.map((t) => {
+    const rows = trialCriteria(t);
+    const definite = rows.filter((r) => r.ok !== null);
+    const okN = definite.filter((r) => r.ok).length;
+    const pendN = rows.filter((r) => r.ok === null).length;
+    const m = definite.length;
+    const hasEnough = m >= 2; /* E7③：可对照项不足 2 条不给百分数 */
+    const pct = hasEnough ? Math.round((okN / m) * 100) : null;
+    const bad = rows.filter((r) => r.ok === false).concat(rows.filter((r) => r.ok === null));
+    const rest = rows.filter((r) => r.ok === true);
+    const evRow = (r) => `<div style="display:flex;gap:8px;padding:7px 0;border-top:1px dashed var(--line);font-size:12.5px">
+      <span style="flex:0 0 18px;text-align:center">${r.ok === true ? '<b style="color:var(--ok)">✓</b>' : r.ok === false ? '<b style="color:var(--danger)">✕</b>' : '<b style="color:var(--warn)">?</b>'}</span>
+      <span style="flex:0 0 64px;color:var(--muted)">${esc(r.cat)}${r.hard ? ' ·硬性' : ''}</span>
+      <span style="flex:1;min-width:0">记录里是：${esc(r.mine)}<br>条件要求：${esc(r.req)}</span></div>`;
+    return `<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+        <div style="flex:0 0 96px;text-align:center;background:var(--sprout-soft);border-radius:12px;padding:10px 6px">
+          <div style="font-size:26px;font-weight:700;color:var(--sprout-deep)">${pct === null ? '—' : pct + '%'}</div>
+          <div style="font-size:10.5px;color:var(--muted)">登记字段符合度</div>
+          <div style="font-size:11px;margin-top:4px;color:var(--ink-2)"><b>${okN} / ${m}</b> 项对得上<br>· ${pendN} 项待确认</div>
+          ${pct === null ? '<div style="font-size:10px;color:var(--warn);margin-top:3px">可对照项不足 2 条，不给百分数</div>' : ''}
+        </div>
+        <div style="flex:1;min-width:240px">
+          <b style="font-size:14px">${esc(t.title)}</b>
+          <p class="small-note" style="margin-top:4px">${esc(t.nctLike)} · ${esc(t.phase)} · ${esc(t.status)} · ${esc(t.sponsor)} · ${t.sites} 家中心</p>
+          <p class="small-note" style="margin-top:2px">候选池口径：本页示例 ${trials.length} 项（虚构示例快照，不是全库扫描）。</p>
+          <div class="actions" style="margin-top:8px">${btn('看逐条判据', 'trial-detail', 'soft', `data-key="${esc(t.key)}"`)}</div>
+        </div>
+        <div style="flex:0 0 132px;display:flex;flex-direction:column;gap:5px;align-items:flex-start"><span class="small-note">硬性条件</span>${hardPills(rows) || '<span class="small-note">—</span>'}</div>
+      </div>
+      <details class="phase-fold" style="margin-top:10px"><summary>判据（先看不符合与待确认 ${bad.length} 条）</summary>
+        <div class="fold-body">${bad.map(evRow).join('')}${rest.length ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">符合 ${rest.length} 条（折叠）</summary>${rest.map(evRow).join('')}</details>` : ''}</div>
+      </details>
+    </div>`;
+  }).join('');
   return head('匹配', '「我这份档案，哪些登记能对上？」——只有已核对入档的字段参与对照；未核对候选不参与。', aiBtn('trial')) +
-    `<div class="notice plain">档案字段：确诊（基因报告）✓ 已入库 · 年龄 ✓ 档案属性 · 骨骺状态 ✗ 未记录（待确认）。<b>药物靶点不进对照</b>——「药打哪里」与你的检测条件是两回事。</div>
+    `<div class="card"><h3>档案字段网格（参与对照的字段）</h3>
+      <div class="grid four" style="margin-top:10px">${fields.map(([k, v, st]) => `<div class="card" style="padding:10px 12px"><b style="font-size:12.5px">${esc(k)}</b><p class="small-note" style="margin-top:3px">${esc(v)}</p>${st === '已入库' ? pill('已核对入库', 'green') : pill('未记录（不参与）', 'yellow')}</div>`).join('')}</div>
+      <p class="small-note" style="margin-top:8px"><b>药物靶点不进对照</b>——「药打哪里」与你的检测条件是两回事（靶点在详情浮窗单列展示）。</p></div>
+    <div class="card" style="margin-top:10px"><h3>偏好（只影响排序）</h3><div class="chip-row" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${prefs.map((x) => `<span class="chip">${esc(x)}</span>`).join('')}</div><p class="small-note" style="margin-top:6px">偏好不改变对不对得上的判断，只改变卡片排列顺序。</p></div>
     <p class="small-note" style="margin-top:8px">${esc(DATA.meta.trialNote)}</p>
-    <div style="margin-top:12px">${cards}</div>`;
+    <div style="margin-top:12px">${cards2}</div>`;
 }
 function pageTrialSearch() {
   const f = state.trialFilter;
@@ -674,6 +731,7 @@ function pageTrialSearch() {
     `<div class="card"><div class="form-grid" style="grid-template-columns:1fr 1fr 1fr auto;align-items:end">
       <label>关键词<input data-trial-q value="${esc(f.q)}" placeholder="方向 / 申办方 / 编号"></label>
       <label>状态<select data-trial-status><option value="all">全部</option><option value="招募中">招募中</option><option value="进行中·不再招募">进行中·不再招募</option></select></label>
+      <label>阶段<select data-trial-phase><option value="all">全部</option><option value="III 期">III 期</option><option value="II 期">II 期</option><option value="观察性">观察性</option></select></label>
       <label>排序<select data-trial-sort><option value="status">按状态</option><option value="phase">按期别</option><option value="title">按标题</option></select></label>
       <button data-action="trial-apply" class="primary">按条件检索</button>
     </div><p class="small-note" style="margin-top:8px">双通道：本机快照（虚构示例）+ 在线登记（原型未接入；FAILED 时如实显示「未查过」）。</p></div>
@@ -694,22 +752,41 @@ function pageTrialSaved() {
         ${btn('移出收藏', 'trial-unsave', 'soft', `data-key="${esc(s.key)}"`)}</div></div></div>`;
     }).join('') : emptyBox('还没有收藏', '在「匹配」或「检索」里把感兴趣的登记收进来；收藏只存在本机。', go('去匹配', 'trial', 'match', 'primary'))) ;
 }
-function trialDetailDialog(key) {
+/* E5：详情是右侧浮窗（非居中弹窗）：遮罩 / ✕ / Esc 三个关闭口；不改 hash、不进导航栈；关闭焦点回触发卡 */
+let trialPaneTrigger = null;
+function trialDetailPane(key) {
   const t = (DATA.trials || []).find((x) => x.key === key);
   if (!t) return;
+  trialPaneTrigger = document.activeElement;
   const rows = trialCriteria(t);
   const saved = mem().savedTrials.some((s) => s.key === key);
-  openModal(t.title,
-    `<div class="notice plain">分数与声明：登记字段符合度只按已入档字段对照，<b>不是入选概率</b>；登记状态「未核实」。</div>
-    <div class="card" style="margin-top:10px"><dl class="kv">
-      <dt>登记编号</dt><dd>${esc(t.nctLike)}</dd><dt>期别/状态</dt><dd>${esc(t.phase)} · ${esc(t.status)}</dd>
-      <dt>申办方</dt><dd>${esc(t.sponsor)}</dd><dt>中心数</dt><dd class="nowrap-num">${t.sites}</dd>
-      <dt>年龄要求</dt><dd class="nowrap-num">${t.ageMin}–${t.ageMax} 岁</dd>
-    </dl></div>
-    <div class="card" style="margin-top:10px"><b style="font-size:13px">判据逐条</b>${rows.map((r) => `<div class="kv" style="border-top:1px dashed var(--line);padding-top:8px;margin-top:8px"><dt>${r.ok === true ? '✓' : r.ok === false ? '✕' : '?'} ${esc(r.cat)}${r.hard ? '（硬性）' : ''}</dt><dd>记录里是：${esc(r.mine)}<br>条件要求：${esc(r.req)}</dd></div>`).join('')}</div>
-    <div class="notice danger" style="margin-top:10px">本机快照只存登记的结构化字段，<b>入排标准请到官方登记页核对</b>。</div>
-    <p class="small-note" style="margin-top:8px">快照日期 ${esc(DATA.snapshot.date)}（${esc(DATA.snapshot.source)}）· 快照会过期。</p>`,
-    `${saved ? pill('已收藏', 'green') : btn('收藏（只存本机）', 'trial-save', 'primary', `data-key="${esc(key)}"`)}<button data-action="close">关闭</button>`);
+  $('.trial-mask')?.remove();
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `<div class="trial-mask" data-tp="mask"></div><aside class="trial-pane" role="dialog" aria-modal="true" aria-label="登记详情：${esc(t.title)}">
+    <div class="tp-head"><b>${esc(t.title)}</b><button class="icon-button" data-tp="close" aria-label="关闭详情浮窗">×</button></div>
+    <div class="tp-body">
+      <div class="notice plain">分数与声明：登记字段符合度只按已入档字段对照，<b>不是入选概率、不是入组资格</b>；登记状态「未核实」。</div>
+      <div class="card" style="margin-top:10px"><dl class="kv">
+        <dt>登记编号</dt><dd>${esc(t.nctLike)}</dd><dt>期别/状态</dt><dd>${esc(t.phase)} · ${esc(t.status)}</dd>
+        <dt>申办方</dt><dd>${esc(t.sponsor)}</dd><dt>中心数</dt><dd class="nowrap-num">${t.sites}</dd>
+        <dt>年龄要求</dt><dd class="nowrap-num">${t.ageMin}–${t.ageMax} 岁</dd>
+      </dl></div>
+      <div class="card" style="margin-top:10px"><b style="font-size:13px">判据逐条（先看不符合与待确认）</b>
+        ${rows.slice().sort((a, b) => (a.ok === true) - (b.ok === true)).map((r) => `<div class="kv" style="border-top:1px dashed var(--line);padding-top:8px;margin-top:8px"><dt>${r.ok === true ? '✓' : r.ok === false ? '✕' : '?'} ${esc(r.cat)}${r.hard ? '（硬性）' : ''}</dt><dd>记录里是：${esc(r.mine)}<br>条件要求：${esc(r.req)}</dd></div>`).join('')}
+      </div>
+      <div class="card" style="margin-top:10px"><b style="font-size:13px">研究药物/方向（不进对照分母）</b><p class="small-note" style="margin-top:4px">靶点是「药打哪里」，与你的检测条件是两回事；是否相关由医生与研究中心判断。</p></div>
+      <div class="notice danger" style="margin-top:10px">本机快照只存登记的结构化字段，<b>入排标准请到官方登记页核对</b>。</div>
+      <p class="small-note" style="margin-top:8px">快照日期 ${esc(DATA.snapshot.date)}（${esc(DATA.snapshot.source)}）· 快照会过期。</p>
+    </div>
+    <div class="tp-foot">${saved ? pill('已收藏', 'green') : btn('收藏（只存本机）', 'trial-save', 'primary', `data-key="${esc(key)}"`)}</div>
+  </aside>`;
+  document.body.appendChild(wrap);
+  const pane = wrap.querySelector('.trial-pane');
+  const close = () => { wrap.remove(); const tr = trialPaneTrigger; trialPaneTrigger = null; if (tr && document.contains(tr)) tr.focus(); };
+  wrap.querySelector('[data-tp="close"]').addEventListener('click', close);
+  wrap.querySelector('[data-tp="mask"]').addEventListener('click', close);
+  pane.setAttribute('tabindex', '-1'); pane.focus();
+  wrap._close = close;
 }
 
 /* ---------------- 设置（三 Tab：工作区 / 文档解析 / 临床数据库） ---------------- */
@@ -814,6 +891,21 @@ function openForm(kind, pre = {}) {
       ${field('孩子配合度（家长原话，可空）<input data-f="cooperation" placeholder="如：顺利 / 哭闹后完成">')}
       ${field('备注（可空）<input data-f="note">')}
     </div>`;
+  } else if (kind === 'doc') {
+    title = '登记报告';
+    body = AICAND('growth') + `<div class="form-grid">
+      ${field('报告名称<input data-f="name" placeholder="如：听力检查单（2026-08-15）">')}
+      ${field('类型<select data-f="type"><option>基因检测</option><option>听力</option><option>睡眠</option><option>影像</option><option>门诊</option><option>手术</option><option>其他</option></select>')}
+      ${field('日期<input data-f="d" type="date" max="${esc(TODAY)}">')}
+      ${field('是否有原件<select data-f="hasOriginal"><option value="yes">有原件</option><option value="no">无原件（据二次来源）</option></select>')}
+    </div><p class="small-note" style="margin-top:8px">原件扫描/导入装机后在「设置 · 文档解析」进行；本表单先登记目录。</p>`;
+  } else if (kind === 'hospital') {
+    title = '登记医院';
+    body = `<div class="form-grid">
+      ${field('医院名称<input data-f="name" placeholder="如：省儿童医院">')}
+      ${field('科室<input data-f="dept" placeholder="如：内分泌科">')}
+      ${field('联系方式（电话或「见病历出处」）<input data-f="contact">')}
+    </div>`;
   } else if (kind === 'question') {
     title = '加一条待问';
     body = AICAND('visit') + `<div class="form-grid">${field('想问的问题<input data-f="q" placeholder="如：下次听力什么时候查？">')}</div>`;
@@ -862,6 +954,32 @@ function saveForm(kind, keepOpen) {
     if (!v.d) { toast('日期必填（漏记走「漏记」选项，不选别的日期回填）', { long: true }); return; }
     m.injections.push({ d: v.d, done: v.done, cooperation: v.cooperation || null, note: v.note || null });
     toast(v.done === '漏记' ? '已如实记「漏记」（不回填当天）' : '注射已记录');
+  } else if (kind === 'doc') {
+    title = '登记报告';
+    body = AICAND('growth') + `<div class="form-grid">
+      ${field('报告名称<input data-f="name" placeholder="如：听力检查单（2026-08-15）">')}
+      ${field('类型<select data-f="type"><option>基因检测</option><option>听力</option><option>睡眠</option><option>影像</option><option>门诊</option><option>手术</option><option>其他</option></select>')}
+      ${field('日期<input data-f="d" type="date" max="${esc(TODAY)}">')}
+      ${field('是否有原件<select data-f="hasOriginal"><option value="yes">有原件</option><option value="no">无原件（据二次来源）</option></select>')}
+    </div><p class="small-note" style="margin-top:8px">原件扫描/导入装机后在「设置 · 文档解析」进行；本表单先登记目录。</p>`;
+  } else if (kind === 'hospital') {
+    title = '登记医院';
+    body = `<div class="form-grid">
+      ${field('医院名称<input data-f="name" placeholder="如：省儿童医院">')}
+      ${field('科室<input data-f="dept" placeholder="如：内分泌科">')}
+      ${field('联系方式（电话或「见病历出处」）<input data-f="contact">')}
+    </div>`;
+  } else if (kind === 'doc') {
+    if (!v.name) { toast('报告名称必填', { long: true }); return; }
+    if (!v.d) { toast('日期必填（没记就在纸质原件上查）', { long: true }); return; }
+    const id = 'doc' + Date.now();
+    profile().docs.push({ id, name: v.name, date: v.d, type: v.type, status: '待核对', hasOriginal: v.hasOriginal === 'yes' });
+    toast('报告已登记（待核对；原件导入走设置 · 文档解析）', { long: true });
+  } else if (kind === 'hospital') {
+    if (!v.name) { toast('医院名称必填', { long: true }); return; }
+    if (!mem().hospitals) mem().hospitals = [];
+    mem().hospitals.push({ name: v.name, dept: v.dept, contact: v.contact, version: 1 });
+    toast('医院已登记（可逐条修改，支持多家）');
   } else if (kind === 'question') {
     if (!v.q) { toast('写一句话再保存', { long: true }); return; }
     allQuestions().push({ q: v.q, asked: false });
@@ -1022,6 +1140,8 @@ document.addEventListener('click', (e) => {
     case 'form-surgery': openForm('surgery'); break;
     case 'form-injection': openForm('injection'); break;
     case 'form-question': openForm('question'); break;
+    case 'form-doc': openForm('doc'); break;
+    case 'form-hospital': openForm('hospital'); break;
     case 'form-save': saveForm(t.dataset.kind, false); break;
     case 'form-save-continue': saveForm(t.dataset.kind, true); break;
     case 'correct-surgery': openForm('correct-surgery', { id: t.dataset.id, name: t.dataset.name, d: t.dataset.d, org: t.dataset.org, quote: t.dataset.quote, v: t.dataset.v }); break;
@@ -1050,10 +1170,10 @@ document.addEventListener('click', (e) => {
     case 'export-pack': exportPack(); break;
     case 'toggle-question': { const qs = allQuestions(); qs[Number(t.dataset.i)].asked = !qs[Number(t.dataset.i)].asked; render(); break; }
     case 'rhythm-to-questions': { const qs = allQuestions(); if (!qs.some((q) => q.q.includes('下次复查安排'))) qs.push({ q: '下次复查安排与要查的项目（清单页发起）', asked: false }); toast('已把「问医生」事项加进待问清单'); goHash('visit', 'questions'); break; }
-    case 'trial-detail': trialDetailDialog(t.dataset.key); break;
-    case 'trial-save': mem().savedTrials.push({ key: t.dataset.key, savedOn: TODAY, state: '在跟' }); closeModal(); toast('已收藏（只存本机）'); render(); break;
+    case 'trial-detail': trialDetailPane(t.dataset.key); break;
+    case 'trial-save': mem().savedTrials.push({ key: t.dataset.key, savedOn: TODAY, state: '在跟' }); { const mask = $('.trial-mask'); if (mask) mask.parentElement._close(); } toast('已收藏（只存本机）'); render(); break;
     case 'trial-unsave': mem().savedTrials = mem().savedTrials.filter((s) => s.key !== t.dataset.key); render(); break;
-    case 'trial-apply': { state.trialFilter.q = $('[data-trial-q]')?.value || ''; state.trialFilter.status = $('[data-trial-status]')?.value || 'all'; state.trialFilter.sort = $('[data-trial-sort]')?.value || 'status'; render(); toast('已按你选的条件排列（不掺分数）'); break; }
+    case 'trial-apply': { state.trialFilter.q = $('[data-trial-q]')?.value || ''; state.trialFilter.status = $('[data-trial-status]')?.value || 'all'; state.trialFilter.phase = $('[data-trial-phase]')?.value || 'all'; state.trialFilter.sort = $('[data-trial-sort]')?.value || 'status'; render(); toast('已按你选的条件排列（不掺分数）'); break; }
     default: break;
   }
 });
@@ -1063,6 +1183,7 @@ document.addEventListener('change', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  if ($('.trial-pane')) { $('.trial-mask').parentElement._close(); return; } /* E5：浮窗 Esc 只退浮窗 */
   if ($('#dialog')?.open) return; /* 弹窗 Esc 由 dialog 原生处理 */
   if ($('.page-view')) { history.back(); return; } /* A2：一层一退 */
 });

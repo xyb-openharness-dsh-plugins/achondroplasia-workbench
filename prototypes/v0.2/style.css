@@ -275,3 +275,12 @@ dialog::backdrop{background:rgba(30,40,32,.38)}
   .breadcrumb{display:none}
   .dash-status .big{font-size:26px}
 }
+
+/* ---------- 试验详情右侧浮窗（E5：非居中弹窗） ---------- */
+.trial-mask{position:fixed;inset:32px 0 0;background:rgba(30,40,32,.32);z-index:45}
+.trial-pane{position:fixed;top:32px;right:0;bottom:0;width:min(480px,92vw);background:#fff;border-left:1px solid var(--line);box-shadow:-12px 0 40px rgba(46,54,48,.12);z-index:46;display:flex;flex-direction:column}
+.trial-pane .tp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.trial-pane .tp-head b{font-size:13.5px;line-height:1.5}
+.trial-pane .tp-body{flex:1;overflow-y:auto;padding:14px 18px}
+.trial-pane .tp-foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:9px}
+@media (max-width:600px){.trial-pane{width:100vw}}

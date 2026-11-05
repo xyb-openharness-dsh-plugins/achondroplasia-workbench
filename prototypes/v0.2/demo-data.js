@@ -88,6 +88,9 @@ window.DEMO_DATA = {
         { q: '需要做睡眠监测吗？孩子偶尔打鼾。', asked: false },
         { q: '遗传咨询与再生育风险，需要哪个科室？', asked: false }
       ],
+      hospitals: [
+        { name: '市儿童医院', dept: '儿科内分泌', contact: '见病历出处', version: 1 }
+      ],
       family: {
         visibility: 'private',
         notes: [
@@ -240,6 +243,11 @@ window.DEMO_DATA = {
         { q: '膝内翻什么情况下需要骨科干预？（只问观察指征，不要求建议）', asked: false },
         { q: '下一次取药时间与备药量。', asked: false },
         { q: '学校体育课注意事项要不要医生写一句给老师？', asked: false }
+      ],
+      hospitals: [
+        { name: '省儿童医院', dept: '内分泌科', contact: '见病历出处', version: 1 },
+        { name: '省儿童医院', dept: '耳鼻喉科', contact: '复查预约电话见就诊卡', version: 1 },
+        { name: '省儿童医院', dept: '儿科骨科', contact: '随诊约号 App', version: 1 }
       ],
       family: {
         visibility: 'private',
