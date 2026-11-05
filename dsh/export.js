@@ -71,6 +71,20 @@ export function renderPrepMarkdown(profile, { generatedAt = null, version = null
   const hospLines = (profile.hospitals ?? []).map((h) => `- ${h.name}${h.dept ? ` · ${h.dept}` : ''}（联系：${h.contact ?? '见病历出处'}）`)
   out.push(section('就诊医院', hospLines.join(LINE)))
 
+  /* 「最近几次的变化」段（check-pack 断言在；只列已发生事实，不写判读） */
+  const deltaLines = []
+  for (const [code, pts] of Object.entries(profile.metrics ?? {})) {
+    const dated = pts.filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.d ?? ''))
+    if (dated.length >= 2) {
+      const a = dated[dated.length - 2], b = dated[dated.length - 1]
+      deltaLines.push(`- ${METRIC_NAMES[code] ?? code}：${b.d} ${b.v}${UNIT[code] ?? ''}（较上次 ${a.d} ${a.v}${UNIT[code] ?? ''}）`)
+    }
+  }
+  const recentEvents = [
+    ...(profile.events?.surgeries ?? []).slice(-2).map((s) => `- 手术：${s.d} ${s.name}`),
+    ...(profile.events?.meds ?? []).filter((m) => m.start).map((m) => `- 用药开始：${m.start} ${m.drug}`),
+  ]
+  out.push(section('最近几次的变化', [...deltaLines, ...recentEvents].join(LINE) || '- 暂无带日期的记录变化（如实留白）'))
   out.push(section('口径说明', [
     '生长值只并列官方软骨发育不全专用生长曲线（Hoover-Fong 等 2022，据二次来源）的参考口径；本台不判定「达标/落后」，对照口径【待核】，以随访医生安排为准。',
     '筛查项目与频次以随访医生安排为准；本台清单不构成检查建议。',

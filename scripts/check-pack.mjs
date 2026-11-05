@@ -97,7 +97,7 @@ try {
   }
   notes.push(`✓ 静态七件 · 200 且内容对（含 primer 三件套，index.html 三处引用齐）`);
 
-  const md = await (await fetch(`${base}/api/achondroplasia/export/A.md`)).text();
+  const md = await (await fetch(`${base}/api/achondroplasia/export/demo2.md`)).text();
   if (!/## 最近几次的变化/.test(md)) throw new Error('导出里没有「最近几次的变化」——装的是旧包');
   if (/性交痛|干涩/.test(md)) throw new Error('导出里出现私密原文');
   notes.push(`✓ 导出 · ${Buffer.byteLength(md, 'utf8')} B · 变化段在 · 无私密`);
@@ -105,7 +105,7 @@ try {
   /* 设置页的 Token 读写：这是唯一会**写用户磁盘**的接口，必须从 tarball 里验，
      而且要指到临时文件——绝不能碰用户真实的 ~/.cervipal/secrets。 */
   const secret = join(tmp, 'mineru-secret.json');
-  process.env.CERVIPAL_MINERU_SECRET = secret;
+  process.env.GROWPAL_MINERU_SECRET = secret;
   process.env.MINERU_TOKEN = ''; // 别让环境变量兜底，掩盖"文件没写进去"
   const before = await (await fetch(`${base}/api/achondroplasia/settings/mineru`)).json();
   if (before.configured) throw new Error('临时密钥文件还没写就报已配置（环境变量没清干净？）');

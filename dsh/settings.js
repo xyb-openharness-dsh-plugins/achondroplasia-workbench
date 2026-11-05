@@ -6,9 +6,9 @@
  * 这里只有一份实现，`dsh/mineru.js` 也 import 它。
  *
  * 文件位置（2026-10-22 定）：
- * 1. `CERVIPAL_MINERU_SECRET` 环境变量（测试与排障用，直接指定文件）；
+ * 1. `GROWPAL_MINERU_SECRET` 环境变量（测试与排障用，直接指定文件）；
  * 2. 仓库内 `.secrets/mineru.json`（已存在就沿用——开发与自用时的既有约定）；
- * 3. 用户目录 `~/.cervipal/secrets/mineru.json`（装机后的落点）。
+ * 3. 用户目录 `~/.growpal/secrets/mineru.json`（装机后的落点）。
  *
  * 为什么不是永远写包内 `.secrets/mineru.json`：装进 Desktop 后包位于
  * `.../node_modules/@xyb-community/achondroplasia-workbench/`，升级插件会整目录替换，
@@ -28,13 +28,13 @@ import { fileURLToPath } from 'node:url'
 /** 申请 / 重置 Token 页。同一地址也用于前端识别"这是一类 Token 问题"。 */
 export const MINERU_TOKEN_URL = 'https://mineru.net/apiManage/token'
 /** 显式指定密钥文件的环境变量（测试与排障）。 */
-export const MINERU_SECRET_ENV = 'CERVIPAL_MINERU_SECRET'
+export const MINERU_SECRET_ENV = 'GROWPAL_MINERU_SECRET'
 /** 仓库内既有位置。 */
 export const PACKAGE_SECRET_FILE = fileURLToPath(new URL('../.secrets/mineru.json', import.meta.url))
 
 /** 装机后实际使用的文件：用户目录，不随插件升级被删除。 */
 export function userSecretFile(home = homedir()) {
-  return join(home, '.cervipal', 'secrets', 'mineru.json')
+  return join(home, '.growpal', 'secrets', 'mineru.json')
 }
 
 /** 当前生效的密钥文件：env > 已存在的包内文件 > 用户目录。 */
