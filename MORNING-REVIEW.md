@@ -44,3 +44,4 @@
 - **检查器盲区**：MT01–MT15、IP3–IP9、X2–X4、Q20–Q25/Q27–Q30/Q32–Q34 为文档判据（checker 组现状注明），未逐条脚本化——不写「检查器通过」；清单见 docs/BACKFLOW.md 待实施节。
 - **schema 两次发布前修正**（0001 documents id 语义 + 0003/0004 业务 id 列）：修正记录在 freeze-contract.md，无发布产物存在，未违反冻结纪律。
 - **异常已修**：const DATA 吞 api 态（L62）、customFrame 注释假红（L63）、demo id 全库唯一撞 UNIQUE（L61）——全部留修复痕迹。
+- **提交事故（已修复留痕）**：M7/M8/M9 文档曾因 shell cwd 残留误提交到 xyb-workbench-starter 仓（1b6c38f、a427fc5），已在该仓以 dd03612、27beca2 两次 revert 恢复原状并推送；正身在本仓 3f864af。教训已记：跨仓操作一律用 `git -C` 显式路径。
