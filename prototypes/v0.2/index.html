@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小苗宝 GrowPal · 软骨发育不全患儿家庭工作台原型 v0.2</title>
+<meta name="description" content="软骨发育不全（Achondroplasia）患儿家庭工作台交互原型：生长记录、筛查台账、手术与注射事件、就诊准备、登记线索。演示数据，全部为合成资料。">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="primer.css">
+</head>
+<body>
+<a class="skip" href="#main">跳到主要内容</a>
+<div class="prototype-bar"><span><b>交互原型 v0.2</b> · 全部为合成示例（虚构患儿与数值）</span><span>仅本页演示 · 刷新重置 · 未接入 DSH / AI</span></div>
+<div class="workspace">
+  <aside class="sidebar" aria-label="小苗宝业务导航">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 48 48" width="48" height="48" aria-hidden="true"><rect x="4" y="4" width="40" height="40" rx="12" fill="#E7F2E4"/><path d="M24 40c0-9 0-14 0-18" stroke="#2F6B40" stroke-width="2.4" stroke-linecap="round" fill="none"/><path d="M24 26c-6-1-10-5-10.6-11 6 .6 9.8 4 10.6 11z" fill="#4A8A5C"/><path d="M24 21c.9-6.4 4.7-9.8 10.6-10.4C34 16.8 30 20.7 24 21z" fill="#6BA97A"/><circle cx="24" cy="40" r="2.6" fill="#B06A28"/></svg>
+    </span><div><strong>小苗宝</strong><span>GrowPal · achondroplasia</span></div></div>
+    <button class="profile profile-btn" id="profile-btn" data-action="profiles" aria-label="切换演示档案，当前为苗苗">
+      <div class="avatar" id="profile-avatar" aria-hidden="true">苗</div>
+      <div><b id="profile-name">苗苗的档案</b><span id="profile-meta">2 岁 3 月 · 家长代记</span></div>
+      <span class="profile-caret" aria-hidden="true">⌄</span>
+    </button>
+    <nav id="nav" aria-label="一级导航"></nav>
+    <div class="sidebar-bottom"><span class="eyebrow">小 X 宝家族</span><p>一次一记录，<br>随访路上不慌。</p><button class="text-button" data-action="help">原型操作说明 ↗</button></div>
+  </aside>
+  <div class="stage">
+    <div class="work-area">
+      <header class="topbar">
+        <div class="breadcrumb">小苗宝工作台 <span>/</span> <b id="breadcrumb">看板</b></div>
+        <div class="top-actions">
+          <button class="status" data-action="open-store" aria-label="资料目录：示意（原型）"><i></i><span>资料目录</span><b>示意</b></button>
+          <button data-action="settings" aria-label="打开设置：工作区目录、文档解析、临床数据包">设置</button>
+          <button id="font-toggle" aria-pressed="false" title="切换大字">大字 Aa</button>
+          <button id="agent-toggle" data-action="agent-toggle" aria-expanded="false" aria-controls="agent-pane">AI 对话</button>
+          <button class="ver-chip" id="ver-chip" data-action="about" aria-label="关于小苗宝：查看版本号与构建信息">v0.2</button>
+          <button class="primer-btn" data-primer-open aria-label="疾病概要：定义、医学资料规范和指南情况、治疗全景、发展趋势" title="疾病概要（整页）">?</button>
+        </div>
+      </header>
+      <main id="main" tabindex="-1"></main>
+      <footer class="footer">小苗宝 GrowPal · 与软骨发育不全患儿家庭一起记录生长、整理随访、准备沟通 · 判读归医疗团队 <span class="ver-line"><b id="app-version">v0.2</b><em id="app-build">2026-11-06</em></span></footer>
+    </div>
+    <div id="agent-splitter" role="separator" aria-orientation="vertical" aria-label="调整 AI 对话面板宽度（左右方向键步进）" aria-valuemin="25" aria-valuemax="45" aria-valuenow="35" tabindex="0" hidden></div>
+    <aside id="agent-pane" aria-label="AI 对话面板" hidden>
+      <div class="agent-head">
+        <span id="agent-label" class="agent-label">AI 对话 · 演示</span>
+        <button id="agent-hide" class="icon-button" data-action="agent-hide" aria-label="收起 AI 对话">×</button>
+      </div>
+      <div class="agent-body">
+        <div class="notice plain">这是<b>演示面板</b>：原型未接入真实 AI。嵌入式（壳层 iframe）形态里，「AI 协助」会把预写提示词 + 已确认档案上下文<b>直接发送</b>到 AI 对话（achondroplasia:agent-draft · send:true，34 号契约）；AI 回复是<b>候选</b>，核对才采纳。</div>
+        <div class="agent-msg user"><b>演示输入</b><p>把苗苗最近三次身长和头围排成一段话，复查时照着说。</p></div>
+        <div class="agent-msg bot"><b>演示回复（未接通）</b><p>真实版本会在这里基于已核对记录生成草稿；本原型不生成内容。</p></div>
+        <p class="small-note">私密内容（visibility=private 的记录）默认不进入 AI 上下文；需要带入时逐条显式勾选。</p>
+      </div>
+      <div class="agent-foot"><input placeholder="演示：未接入，输入不可用" disabled aria-label="演示输入框，未接入"></div>
+    </aside>
+  </div>
+</div>
+<dialog id="dialog" aria-labelledby="dialog-title">
+  <div class="dialog-head"><div><span class="eyebrow" id="dialog-eyebrow">小苗宝</span><h2 id="dialog-title"></h2></div><button class="icon-button" data-action="close" aria-label="关闭弹窗">×</button></div>
+  <div id="dialog-body" class="dialog-body"></div>
+  <div id="dialog-foot" class="dialog-foot"></div>
+</dialog>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="demo-data.js"></script>
+<script src="primer-data.js"></script>
+<script src="primer.js"></script>
+<script src="app.js"></script>
+</body></html>
