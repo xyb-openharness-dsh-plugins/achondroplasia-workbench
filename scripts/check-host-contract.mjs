@@ -65,7 +65,9 @@ else if (!/^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+?(?:\.git)?\/
 }
 
 // 4) customFrame 必须是 boolean（宿主：Invalid custom frame flag）
-const cf = both.match(/["']?(?:customFrame|CUSTOM_FRAME)["']?\s*[:=]\s*([^,}\n]+)/)?.[1]?.trim()
+// 剥掉注释行再匹配：头注释里的「customFrame=false 标准分栏」是史述不是代码（starter 版会误报）。
+const stripComments = (t) => t.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n')
+const cf = stripComments(both).match(/["']?(?:customFrame|CUSTOM_FRAME)["']?\s*[:=]\s*([^,}\n]+)/)?.[1]?.trim()
 if (cf && !/^(true|false)$/.test(cf)) problems.push(`customFrame 不是 true/false 字面量：${cf}（宿主：Invalid custom frame flag）`)
 
 // 5) businessSide ∈ {left,right}（宿主：Invalid workbench business side）
@@ -94,7 +96,7 @@ const hl = both.match(/["']?headerLayout["']?\s*:\s*["']([^"']+)["']/)?.[1]
 if (hl && !['default', 'compact'].includes(hl)) problems.push(`headerLayout 只能是 default/compact，当前 ${hl}`)
 
 console.log('宿主注册契约自查（lib/client.js + lib/layout.js）')
-console.log(`  customFrame=${cf ?? '未设'} · businessSide=${side ?? '未设'} · businessWidth=${width ?? '未设'}`)
+console.log(`  customFrame=${cf ?? '未设'} · businessSide=${side ?? '未设'} · businessWidth=${width ?? '未设'}（断言在剥注释后进行）`)
 for (const n of notes) console.log(`  · ${n}`)
 if (problems.length) {
   console.error(`\n✗ ${problems.length} 条不合格——这份包装进 Desktop 后会激活失败：`)

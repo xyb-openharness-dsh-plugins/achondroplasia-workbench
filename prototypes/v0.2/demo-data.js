@@ -26,6 +26,8 @@ window.DEMO_DATA = {
         stage: '确诊 3 个月 · 建档起步',
         anchorLabel: '距确诊日',
         anchorDays: 96,
+        anchorDate: '2026-08-01',
+        anchorDate: '2026-08-01',
         nextVisit: '下次随访待约（内分泌门诊 · 以预约为准）',
         lastHeight: { v: 84.2, d: '2026-10-18' },
         lastHead: { v: null, d: null },
@@ -53,7 +55,7 @@ window.DEMO_DATA = {
           { d: '2026-10-18', v: 10.9, src: '家庭自测', org: null }
         ],
         HEAD: [
-          { d: '（日期未记，约 2026 年 7 月）', v: 47.8, src: '家长回忆', org: null, precision: 'unknown' }
+          { d: '（日期未记）', v: 47.8, src: '家长回忆', org: null, precision: 'unknown' }
         ],
         BMIW: []
       },
@@ -110,6 +112,8 @@ window.DEMO_DATA = {
         stage: '每日注射第 8 个月 · 随访节律稳定',
         anchorLabel: '距上次复诊',
         anchorDays: 41,
+        anchorDate: '2026-09-25',
+        anchorDate: '2026-09-25',
         nextVisit: '2026-11-20（内分泌 + 耳鼻喉听力复查，以预约为准）',
         lastHeight: { v: 112.8, d: '2026-10-25' },
         lastHead: { v: 54.6, d: '2026-09-12' },

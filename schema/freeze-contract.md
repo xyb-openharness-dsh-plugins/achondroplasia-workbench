@@ -7,11 +7,14 @@
 
 | 文件 | sha256 |
 | --- | --- |
-| `0001_initial.sql` | e7baa4fba7dee185be85a0a4627efe139860cc51978342e428afb1d53052340b |
+| `0001_initial.sql` | ec1d7ae844288eeb15c320e764f334e2ac770b0966b2262b617d7138b3e2e9f7 |
+| `0002_profile_meta.sql` | 43ff1ae6f72d730598476c35b70ed4e39fd79e83e7c8f071cd9c57d443eff4bb |
+| `0003_candidate_bus_id.sql` | 7c65b028ed1d841c09400b79008b54f691553a3a89425432d8553550ffa3e9cf |
+| `0004_surgery_bus_id.sql` | c08973c0e73f0d35aa89cb611651e6df34cfc8e408a2bf378e3e2d97ebf9c3e8 |
 
 ## 0001 的内容边界（写在冻结之前，便于日后审）
 
-22 张表，四组：
+23 张表，四组（0002 补 profile_meta；0003 补 candidate_fields.cand_id 业务 id；0004 补 surgery_rows.surg_id 业务 id——两者在档案内唯一，demo-data 记作 c1/s1）：
 
 - **档案级 2 张**：`subjects`（档案标量：姓名/性别/年龄标签/代记视角/状态原文/医生原话/遗传说明——全部为记录性文本，无判定列）与 `section_titles`（`profile_key + key → title + ord`）。
 - **指标 3 张**：`metrics` / `metric_points` / `growth_reference_rows`。
@@ -26,3 +29,7 @@
 全表全列不得出现 `diagnosis` / `risk_level` / `activity_score` / `eligible` / `milestone_status` 等派生判定列；
 `done`（已注射/漏记）与 `state`（在跟/准备问/已归档）是**记录态**枚举，不是对病情或资格的判定；
 生长「达标/落后」、百分位对照值一律读时算或【待核】，不落库。
+
+## 0001 发布前修正记录（2026-11-06 00:55，尚无发布产物/tag）
+
+- 修正 2（同刻）：documents 改代理主键 `id INTEGER` + 业务列 `doc_id TEXT`（UNIQUE(profile_key, doc_id)）——演示数据文档 id 在档案内唯一而非全库唯一（demo1/demo2 都有 doc1），全库 TEXT PK 会撞 UNIQUE；`screening_rows.doc_id` INTEGER → TEXT：演示数据与导入链路的文档 id 一律是字符串（doc1/doc2/…/A-D1），INTEGER PK 收字符串会 `datatype mismatch`（test/demo-parity.test.mjs 抓到）。哈希已同步更新。此后按冻结纪律：只新增 000N。

@@ -13,7 +13,7 @@
    - 非肿瘤红线：无「达标/落后」判定、无风险评分；阈值与频次一律【待核】或医生原话。 */
 'use strict';
 const $ = (s, r = document) => r.querySelector(s);
-const APP_INFO = { name: '小苗宝 GrowPal', version: 'v0.2', build: '2026-11-06' };
+const APP_INFO = { name: '小苗宝 GrowPal', version: '0.2.0', build: '2026-11-06' };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dOf = (d) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : null);
 const fmtD = (d) => (d && d.length >= 10 ? d.slice(0, 10) : String(d ?? ''));
@@ -91,9 +91,57 @@ const state = {
   agent: { open: false },
   toastTimer: 0
 };
-const DATA = typeof DEMO_DATA !== 'undefined' ? DEMO_DATA : { meta: {}, profiles: [], trials: [] };
+let DATA = typeof DEMO_DATA !== 'undefined' ? DEMO_DATA : { meta: {}, profiles: [], trials: [] };
 const TODAY = DATA.meta?.today || '2026-11-05';
+/* ---------------- 数据层（原型 / 开发版同一份渲染代码） ----------------
+   ① file:// 双击原型：直接读 demo-data.js（演示态，顶部条明说）；
+   ② dev-server / DSH 宿主从 /ui/ 提供：先向 /api/achondroplasia/bootstrap 要本机库真数据，
+      拿不到（或库为空）才回退演示数据——三态 api/demo/empty，不拿演示档案把空工作区填满。
+   （34 号桥、私密三出口、渲染代码与数据源解耦；public/ 与本文件逐字符一致。） */
+let DATA_SOURCE = 'demo';
 const profile = () => DATA.profiles.find((p) => p.id === state.profileId) || DATA.profiles[0];
+function apiBase() {
+  if (location.protocol === 'file:') return null;
+  const m = location.pathname.match(/^(.*)\/ui(?:\/|$)/);
+  if (!m) return null; /* 非 /ui/ 路径（静态打开原型）＝没有服务，直接演示态，不发探底请求 */
+  return m[1].replace(/\/$/, '');
+}
+async function loadBootstrap() {
+  const base = apiBase();
+  if (base === null) return 'demo';
+  try {
+    const res = await fetch(base + '/bootstrap', { headers: { accept: 'application/json' }, credentials: 'same-origin' });
+    if (!res.ok) return 'demo';
+    const data = await res.json();
+    if (!Array.isArray(data?.profiles) || !data.profiles.length) {
+      DATA = { profiles: [], meta: data?.meta ?? null, trials: [], snapshot: data?.snapshot ?? null };
+      return 'empty';
+    }
+    DATA = data;
+    if (!state.profileId || !DATA.profiles.some((p) => p.id === state.profileId)) state.profileId = DATA.profiles[0].id;
+    return 'api';
+  } catch { return 'demo'; }
+}
+function applySourceBanner() {
+  const bar = document.querySelector('.prototype-bar');
+  if (!bar) return;
+  if (DATA_SOURCE === 'api') bar.innerHTML = '<span><b>本机数据 v' + esc(APP_INFO.version) + '</b> · 数据只存在你选的资料目录</span><span>只整理不判定 · 判读归医疗团队</span>';
+  else if (DATA_SOURCE === 'empty') bar.innerHTML = '<span><b>本机资料目录为空</b> · 上传报告建档后这里就是你的资料</span><span>只整理不判定 · 判读归医疗团队</span>';
+  else bar.innerHTML = '<span><b>离线演示数据</b> · 未连上本机服务，以下内容不是你的资料</span><span>仅本页演示 · 刷新重置 · 未接入 AI</span>';
+}
+async function apiPostJson(path, payload) {
+  const res = await fetch(apiBase() + path, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) });
+  if (!res.ok) { let m = ''; try { m = (await res.json()).message || ''; } catch { /* 保留 HTTP 码 */ } throw new Error(m || ('HTTP ' + res.status)); }
+  return res.json();
+}
+async function apiRefetch() { DATA_SOURCE = await loadBootstrap(); applySourceBanner(); render(); }
+function apiSaveRecord(kind, payload, okMsg) {
+  closeModal();
+  void apiPostJson('/records/' + kind, { profileId: state.profileId, ...payload })
+    .then(() => { toast(okMsg || '已保存', { long: true }); return apiRefetch(); })
+    .catch((e) => toast('未保存：' + e.message, { long: true }));
+  return true;
+}
 const mem = () => state.mem[state.profileId];
 /* private 三出口共用（Q35/H1）：看板摘要预览、导出、AI 上下文全部走 sharedOnly */
 const sharedOnly = (list) => (list || []).filter((v) => v.visibility !== 'private');
@@ -936,6 +984,10 @@ function formCollect() {
 }
 function saveForm(kind, keepOpen) {
   const v = formCollect();
+  if (DATA_SOURCE === 'api') {
+    const map = { measure: 'measure', screening: 'screening', surgery: 'surgery', injection: 'injection', question: 'question', doc: 'doc', hospital: 'hospital', 'correct-surgery': 'correct-surgery', 'correct-measure': 'correct-measure' };
+    return apiSaveRecord(map[kind] || kind, { ...v, kind }, '已保存');
+  }
   const m = mem();
   if (kind === 'measure') {
     if (!v.v || isNaN(Number(v.v))) { toast('数值要填数字（或用键盘上的数字键）', { long: true }); return; }
@@ -1061,6 +1113,8 @@ const ROUTES = {
 };
 /* ---------------- 渲染调度 ---------------- */
 function render(keepScroll) {
+  const pNow = profile();
+  if ($('#profile-name') && pNow) { $('#profile-name').textContent = `${pNow.name}的档案`; $('#profile-meta').textContent = `${pNow.age} · ${CARE_LABEL[pNow.careRole]}`; $('#profile-avatar').textContent = (pNow.name || '苗')[0]; }
   const main = $('#main');
   const scroll = keepScroll ? main.scrollTop : 0;
   const views = { dash: pageDash, growth: pageGrowth, screening: pageScreening, events: pageEvents, visit: pageVisit, trial: () => { const sub = state.sub.trial || 'match'; const subnav = `<div class="subnav">${SUBPAGES.trial.map(([id, label]) => `<button aria-current="${sub === id}" data-action="go" data-page="trial" data-sub="${id}">${label}</button>`).join('')}</div>`; const body = { match: pageTrialMatch, search: pageTrialSearch, saved: pageTrialSaved }[sub](); return subnav + body; } };
@@ -1123,7 +1177,7 @@ document.addEventListener('click', (e) => {
     case 'sel-metric': {
       const code = t.dataset.code; const cur = state.sel[state.profileId] || (state.sel[state.profileId] = []);
       const i = cur.indexOf(code);
-      if (i >= 0) cur.splice(i, 1); else { if (cur.length >= 4) { toast('最多同时 4 条：先取消一条再选'); break; } cur.push(code); }
+      if (i >= 0) cur.splice(i, 1); else { if (cur.length >= 4) { toast('最多同时 4 条：先取消一条再选'); render(); break; } cur.push(code); }
       render(); break;
     }
     case 'layer': state.layer[t.dataset.layer] = !state.layer[t.dataset.layer]; render(); break;
@@ -1155,6 +1209,12 @@ document.addEventListener('click', (e) => {
       if (item) openModal(`${cat.label} · ${item.d ? fmtD(item.d) : '日期未记'}`, `<div class="card"><dl class="kv"><dt>项目</dt><dd>${esc(item.item)}</dd><dt>结果</dt><dd>${esc(item.result)}</dd><dt>机构</dt><dd>${esc(item.org || '未记录')}</dd><dt>原件</dt><dd>${item.docId ? '关联报告见「生长记录 · 报告档案」' : '无原件（据二次来源）'}</dd></dl></div>`); break;
     }
     case 'accept-cand': {
+      if (DATA_SOURCE === 'api') {
+        void apiPostJson(`/candidate/${encodeURIComponent(t.dataset.cand)}/measure/accept`, {})
+          .then(() => { toast('已核对入库（候选→事实层）', { long: true }); return apiRefetch(); })
+          .catch((e) => toast('未确认：' + e.message, { long: true }));
+        break;
+      }
       const c = (profile().candidates || []).find((x) => x.id === t.dataset.cand);
       mem().acceptedCands.push(c.id);
       if (c.kind === 'measure') mem().measures.push({ _id: 'c' + c.id, code: 'HEAD', v: Number((String(c.fields[1][1]).match(/[\d.]+/) || ['0'])[0]), d: c.fields[0][1], src: 'AI 候选核对入库', org: null, visibility: 'shared', _v: 1 });
@@ -1163,7 +1223,9 @@ document.addEventListener('click', (e) => {
       toast('已核对入库（候选→事实层）；拒收的候选零副作用', { long: true });
       render(); break;
     }
-    case 'reject-cand': toast('已拒收这条候选（无副作用：档案与图表不变）'); break;
+    case 'reject-cand':
+      if (DATA_SOURCE === 'api') { void apiPostJson(`/candidate/${encodeURIComponent(t.dataset.cand)}/measure/reject`, {}).then(() => apiRefetch()).catch((e) => toast('未拒收：' + e.message)); break; }
+      toast('已拒收这条候选（无副作用：档案与图表不变）'); break;
     case 'pack-preview': openPackPreview(); break;
     case 'pv-back': history.back(); break;
     case 'pv-close': closePageView(false); break;
@@ -1201,6 +1263,7 @@ window.addEventListener('beforeprint', () => { document.querySelectorAll('detail
 /* ---------------- 启动 ---------------- */
 buildNav();
 applyHash();
+void (async () => { DATA_SOURCE = await loadBootstrap(); applySourceBanner(); render(); })();
 const p0 = profile();
 $('#profile-name').textContent = `${p0.name}的档案`;
 $('#profile-meta').textContent = `${p0.age} · ${CARE_LABEL[p0.careRole]}`;

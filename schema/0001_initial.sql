@@ -134,14 +134,16 @@ CREATE TABLE saved_trials (
 );
 
 CREATE TABLE documents (
-  id INTEGER PRIMARY KEY,
+  id INTEGER PRIMARY KEY,            -- 代理主键（候选引用用）
   profile_key TEXT NOT NULL,
+  doc_id TEXT NOT NULL,              -- 业务文档 id（档案内唯一，如 doc1 / demo2-doc2）
   name TEXT NOT NULL,
   date TEXT,
   type TEXT,
   status TEXT DEFAULT '待核对',
   has_original INTEGER NOT NULL DEFAULT 0,
-  in_use INTEGER NOT NULL DEFAULT 1
+  in_use INTEGER NOT NULL DEFAULT 1,
+  UNIQUE(profile_key, doc_id)
 );
 
 CREATE TABLE candidate_fields (

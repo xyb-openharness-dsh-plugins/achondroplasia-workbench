@@ -24,6 +24,7 @@ function findChrome() {
 const server = createServer(async (req, res) => {
   try {
     const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname)
+    if (urlPath === '/favicon.ico') { res.writeHead(204); res.end(); return }
     const file = normalize(join(ROOT, urlPath))
     if (!file.startsWith(ROOT)) { res.writeHead(403); res.end(); return }
     const body = await readFile(file)
@@ -234,7 +235,7 @@ async function main() {
     const app = window.__ACH_APP__
     app.state.page = 'dash'; app.render()
     const dash = document.querySelector('#main').innerText
-    return { bar: bar.includes('合成示例'), foot: foot.length > 0, dashMentionsDemo: dash.includes('演示') || dash.includes('合成'), catalogSync: app.CATALOG.HEIGHT.unit === 'cm' }
+    return { bar: /合成示例|离线演示数据|演示/.test(bar), foot: foot.length > 0, dashMentionsDemo: dash.includes('演示') || dash.includes('合成'), catalogSync: app.CATALOG.HEIGHT.unit === 'cm' }
   })
   t('Q13', '界面明示「合成示例/演示」', demo.bar && demo.dashMentionsDemo, demo)
 
