@@ -214,6 +214,10 @@ export function createApiHandler({ source, version, build, serveUi, failure = nu
     if (historyMatch) {
       if (req.method !== 'GET') return sendJson(res, 405, { error: 'method_not_allowed' })
       const key = url.searchParams.get('profile') || ''
+      if (historyMatch[1] === 'hospital') {
+        const items = source.db.prepare('SELECT name, dept, contact, version, in_use FROM hospitals WHERE profile_key = ? ORDER BY rowid').all(key)
+        return sendJson(res, 200, { items: items.map((r) => ({ name: r.name, dept: r.dept, contact: r.contact, version: r.version, active: !!r.in_use })) })
+      }
       if (historyMatch[1] === 'surgery') {
         const items = source.db.prepare('SELECT id, name, d, org, doctor_quote, version, in_use FROM surgery_rows WHERE profile_key = ? ORDER BY rowid').all(key)
         return sendJson(res, 200, { items: items.map((r) => ({ id: r.id, name: r.name, d: r.d, org: r.org, doctorQuote: r.doctor_quote, version: r.version, active: !!r.in_use })) })

@@ -16,6 +16,12 @@
 - M9 回流（starter 7ad5d64，1.10.0-rc.15）：host-contract 剥注释修复（可断言）+ LESSONS L61–L63 + check-starter 217 过 + tests 67/67
 - 提交纪律备注：M7/M8/M9 文档曾误提交到 starter 仓（1b6c38f/a427fc5），已在该仓 dd03612/27beca2 两次 revert 恢复；正身在本仓。
 
+## FAMILY-INSPECTOR 全量轮（2026-11-06 03:00–03:40，用户指令）
+- 独立 Inspector §A–§I 全量（24 张逐屏截图 + 全 checker）：**P0=0**；4×P1（F3 api 态继续录入关窗 / F6 医院无修改 / D5 图内私密标注 / E2 检索地区）**全部修复**；P2 五项处理四项（C3 替换 Token 禁用态、A4 版本字面、B1 裁剪表、F2 家庭沟通记录卡），一项留晨审（M4 真实快照入库时点）；inspector 测试写入行已清理（metric_points 回到 40）。
+- 防再犯：test/f3-keepopen.test.mjs（api 态不关窗真实链路探针）进 npm test。
+- 报告与修复留痕：docs/inspector/2026-11-06-M6-对齐后全量.md；BACKFLOW 第三轮。
+- 修复后回归：check 全绿（test 29/29）· probe 17/17 · audit 44/44。
+
 ## 下一步（晨间）
 1. 追认 5 份自动签认；2. 重启 DSH Desktop → 新会话 → verify-desktop-load + 真机走查 → 真机截图 → V3；3. 追认后执行 M7 发布命令与 M8 PR。
 

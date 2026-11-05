@@ -127,7 +127,7 @@ function applySourceBanner() {
   if (!bar) return;
   if (DATA_SOURCE === 'api') bar.innerHTML = '<span><b>本机数据 v' + esc(APP_INFO.version) + '</b> · 数据只存在你选的资料目录</span><span>只整理不判定 · 判读归医疗团队</span>';
   else if (DATA_SOURCE === 'empty') bar.innerHTML = '<span><b>本机资料目录为空</b> · 上传报告建档后这里就是你的资料</span><span>只整理不判定 · 判读归医疗团队</span>';
-  else bar.innerHTML = '<span><b>离线演示数据</b> · 未连上本机服务，以下内容不是你的资料</span><span>仅本页演示 · 刷新重置 · 未接入 AI</span>';
+  else bar.innerHTML = '<span><b>交互原型 v' + esc(APP_INFO.version) + ' · 离线演示数据</b> · 未连上本机服务，以下内容不是你的资料</span><span>仅本页演示 · 刷新重置 · 未接入 AI</span>';
 }
 async function apiPostJson(path, payload) {
   const res = await fetch(apiBase() + path, { method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) });
@@ -135,12 +135,25 @@ async function apiPostJson(path, payload) {
   return res.json();
 }
 async function apiRefetch() { DATA_SOURCE = await loadBootstrap(); applySourceBanner(); render(); }
-function apiSaveRecord(kind, payload, okMsg) {
-  closeModal();
+function apiSaveRecord(kind, payload, okMsg, keepOpen = false) {
+  if (!keepOpen) closeModal();
   void apiPostJson('/records/' + kind, { profileId: state.profileId, ...payload })
-    .then(() => { toast(okMsg || '已保存', { long: true }); return apiRefetch(); })
-    .catch((e) => toast('未保存：' + e.message, { long: true }));
-  return true;
+    .then(() => {
+      if (keepOpen) {
+        /* 保存并继续录入：清空数值/文本输入，保留类别类选择；弹窗不关（F3 三态） */
+        document.querySelectorAll('#dialog-body [data-f]').forEach((el) => {
+          if (el.tagName === 'SELECT') return
+          if (el.type === 'date') return
+          el.value = ''
+        })
+        toast(okMsg || '已保存，可继续录下一条', { long: true })
+      } else {
+        toast(okMsg || '已保存', { long: true })
+      }
+      return apiRefetch()
+    })
+    .catch((e) => { if (!keepOpen) closeModal(); toast('未保存：' + e.message, { long: true }) })
+  return true
 }
 const mem = () => state.mem[state.profileId];
 /* private 三出口共用（Q35/H1）：看板摘要预览、导出、AI 上下文全部走 sharedOnly */
@@ -151,8 +164,13 @@ const CARE_LABEL = { caregiver: '家长代记', patient: '本人查看' };
 /* ---------------- 读模型（派生值读时算，不落库，Q37/Q38） ---------------- */
 function allMeasures(code) {
   const base = (profile().metrics || {})[code] || [];
-  const added = mem().measures.filter((m) => m.code === code).map((m) => ({ d: m.d, v: m.v, src: m.src, org: m.org, _added: true, _id: m._id, _v: m._v || 1 }));
+  const added = mem().measures.filter((m) => m.code === code).map((m) => ({ d: m.d, v: m.v, src: m.src, org: m.org, _added: true, _id: m._id, _v: m._v || 1, visibility: m.visibility || 'shared' }));
   return [...base, ...added];
+}
+/* D5：私密测量不进一图秀与看板 mini 图（三出口同口径）；最近测量表仍可见并带 pill */
+function sharedMeasures(code) { return allMeasures(code).filter((x) => x.visibility !== 'private') }
+function privateMeasureCount() {
+  return CAT_KEYS().reduce((n, c) => n + allMeasures(c).filter((x) => x.visibility === 'private').length, 0)
 }
 const lastOf = (arr) => { const withDate = (arr || []).filter((x) => dOf(x.d)); return withDate.length ? withDate[withDate.length - 1] : null; };
 const prevOf = (arr) => { const withDate = (arr || []).filter((x) => dOf(x.d)); return withDate.length > 1 ? withDate[withDate.length - 2] : null; };
@@ -217,7 +235,7 @@ function goHash(page, sub) {
 /* ---------------- 看板（dash）：hero + 竖条状态卡 + 数据行动带 + 快捷卡 + 最近变化/待办（小粉宝结构，R3 语义） ---------------- */
 function miniTrendCard(code) {
   const m = CATALOG[code]
-  const dated = allMeasures(code).filter((x) => dOf(x.d))
+  const dated = sharedMeasures(code).filter((x) => dOf(x.d))
   if (!dated.length) return ''
   const pts = dated.slice(-8)
   const w = 560, h = 120, padX = 16, padT = 14, padB = 26
@@ -366,7 +384,7 @@ function smoothPath(coords) { /* 单调三次 Hermite（Fritsch–Carlson）：�
 }
 function seriesFor(code, t0, t1) {
   const m = CATALOG[code];
-  const all = allMeasures(code).filter((x) => dOf(x.d));
+  const all = sharedMeasures(code).filter((x) => dOf(x.d));
   if (!all.length || !m) return { code, m, lo: 0, hi: 1, pts: [], all: [] };
   const vals = all.map((x) => x.v);
   const lo = Math.min(...vals), hi = Math.max(...vals);
@@ -492,7 +510,8 @@ function pageGrowthOverview() {
   const { svg, drawn, evs } = renderChart()
   const [t0, t1] = domain()
   const fmt = (t) => { const d = new Date(t); return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}` }
-  const legend = drawn.map((sx) => `<span class="lg"><span class="dot" style="background:${sx.m.color}"></span>${esc(sx.m.name)} <b>${esc(num(sx.pts.at(-1).v))}</b>${sx.m.unit ? ' ' + esc(sx.m.unit) : ''} <span class="muted">全期 ${esc(num(sx.lo))}–${esc(num(sx.hi))}</span></span>`).join('')
+  const privN = privateMeasureCount()
+  const legend = drawn.map((sx) => `<span class="lg"><span class="dot" style="background:${sx.m.color}"></span>${esc(sx.m.name)} <b>${esc(num(sx.pts.at(-1).v))}</b>${sx.m.unit ? ' ' + esc(sx.m.unit) : ''} <span class="muted">全期 ${esc(num(sx.lo))}–${esc(num(sx.hi))}</span></span>`).join('') + (privN ? ` <span class="pill yellow">私密 ${privN} 条不含</span>` : '')
   const evLegend = ['手术', '筛查', '注射']
   const evOn = evLegend.filter((k) => state.layer[{ 手术: 'surgery', 筛查: 'screening', 注射: 'injection' }[k]])
   const pills = `<span class="pill green">${drawn.length} 个指标</span><span class="pill grey">仅已入库记录</span>`
@@ -577,7 +596,7 @@ function pageGrowthRecent() {
         <td>${esc(CATALOG[r.code].name)}</td>
         <td class="num">${esc(num(r.v, CATALOG[r.code].dec))}${CATALOG[r.code].unit ? ' ' + esc(CATALOG[r.code].unit) : ''}</td>
         <td>${esc(r.src || '未记录')}</td>
-        <td>${esc(r.org || '未记录')}${r.org === null && r.src === '家庭自测' ? ' ' + pill('家庭自测', 'grey') : ''}</td>
+        <td>${esc(r.org || '未记录')}${r.visibility === 'private' ? ' ' + pill('私密', 'yellow') : ''}${r.org === null && r.src === '家庭自测' ? ' ' + pill('家庭自测', 'grey') : ''}</td>
         <td>${ver(r)}${dOf(r.d) ? btn('详情', 'point', 'text-button', `data-code="${esc(r.code)}" data-d="${esc(r.d)}"`) : ''}</td>
       </tr>`).join('')}</tbody></table><div class="scroll-hint">← 表格可横向滚动 →</div></div>`
       : emptyBox('还没有测量记录', '从「记一次测量」开始；家用软尺与门诊测量值并列保存，不合并。'))
@@ -763,15 +782,19 @@ function pageVisitPack() {
 function hospitalsBlock() {
   const base = profile().hospitals || [];
   const list = [...base, ...(mem().hospitals || [])];
-  return `<div class="section-title"><div><span class="eyebrow">就医信息</span><h2>就诊医院（支持多家）</h2><p>逐条卡片；联系方式可填电话或「见病历出处」。</p></div>${btn('＋ 登记医院', 'form-hospital', 'primary')}</div>
-    ${list.length ? `<div class="grid two">${list.map((h) => `<div class="card"><h3>${esc(h.name)}</h3><dl class="kv" style="margin-top:6px"><dt>科室</dt><dd>${esc(h.dept || '未记录')}</dd><dt>联系</dt><dd>${esc(h.contact || '见病历出处')}</dd>${h.version > 1 ? `<dt>版本</dt><dd>v${h.version}（更正=新版本）</dd>` : ''}</dl></div>`).join('')}</div>` : emptyBox('还没有登记医院', '把常去的医院与科室记下来，复诊安排不乱。', btn('＋ 登记医院', 'form-hospital', 'primary'))}`;
+  return `<div class="section-title"><div><span class="eyebrow">就医信息</span><h2>就诊医院（支持多家）</h2><p>逐条卡片；联系方式可填电话或「见病历出处」；更正=新增版本，旧版本可查。</p></div>${btn('＋ 登记医院', 'form-hospital', 'primary')}</div>
+    ${list.length ? `<div class="grid two">${list.map((h, i) => `<div class="card"><h3>${esc(h.name)}</h3><dl class="kv" style="margin-top:6px"><dt>科室</dt><dd>${esc(h.dept || '未记录')}</dd><dt>联系</dt><dd>${esc(h.contact || '见病历出处')}</dd><dt>版本</dt><dd>v${h.version || 1}${h.version > 1 ? '（更正=新版本）' : ''}</dd></dl>
+      <div class="actions" style="margin-top:8px">${btn('修改（新增版本）', 'correct-hospital', 'soft', `data-i="${i}" data-name="${esc(h.name)}" data-dept="${esc(h.dept || '')}" data-contact="${esc(h.contact || '')}"`)}${btn('查看历史', 'hospital-history', 'text-button', `data-name="${esc(h.name)}" data-dept="${esc(h.dept || '')}"`)}</div></div>`).join('')}</div>` : emptyBox('还没有登记医院', '把常去的医院与科室记下来，复诊安排不乱。', btn('＋ 登记医院', 'form-hospital', 'primary'))}`;
 }
 function pageVisitQuestions() {
   const qs = allQuestions();
+  const fam = profile().family?.notes || []
   return head('待问清单', '复诊想问的问题逐条勾选；问过的保留记录不删除。', `${btn('＋ 加一条', 'form-question', 'primary')}${aiBtn('visit')}`) +
     (qs.length ? `<div class="table-wrap"><table><thead><tr><th>问题</th><th>状态</th><th></th></tr></thead><tbody>
       ${qs.map((q, i) => `<tr><td>${esc(q.q)}</td><td>${q.asked ? pill('已问', 'green') : pill('未问', 'grey')}</td><td>${btn(q.asked ? '标回未问' : '标为已问', 'toggle-question', 'text-button', `data-i="${i}"`)}</td></tr>`).join('')}
-    </tbody></table></div>` : emptyBox('还没有想问的', '把复查前想到的问题记下来；AI 可以帮你起草（候选需核对）。', `${btn('＋ 加一条', 'form-question', 'primary')}`));
+    </tbody></table></div>` : emptyBox('还没有想问的', '把复查前想到的问题记下来；AI 可以帮你起草（候选需核对）。', `${btn('＋ 加一条', 'form-question', 'primary')}`)) +
+    `<div class="section-title"><div><span class="eyebrow">家庭记录</span><h2>家庭沟通记录</h2><p>默认私密：不进看板摘要预览、导出与 AI 上下文（三出口同一过滤）。</p></div>${btn('＋ 记一条家庭沟通', 'form-family', 'primary')}</div>` +
+    (fam.length ? `<div class="grid two">${fam.map((n) => `<div class="card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b style="font-size:13.5px">${esc(n.item)}</b>${pill('私密', 'yellow')}</div><p class="small-note" style="margin-top:4px">${n.d ? esc(n.d) : '日期未记'}</p></div>`).join('')}</div>` : emptyBox('还没有家庭沟通记录', '和学校、长辈、亲戚的沟通经过都可以记在这里；默认仅本机可见。', btn('＋ 记一条家庭沟通', 'form-family', 'primary')));
 }
 function pageVisit() {
   const sub = state.sub.visit || 'pack';
@@ -887,13 +910,14 @@ function pageTrialMatch() {
 }
 function pageTrialSearch() {
   const f = state.trialFilter;
-  const items = (DATA.trials || []).filter((t) => (!f.q || (t.title + t.nctLike + t.sponsor).includes(f.q)) && (f.status === 'all' || t.status === f.status) && (f.phase === 'all' || t.phase === f.phase))
+  const items = (DATA.trials || []).filter((t) => (!f.q || (t.title + t.nctLike + t.sponsor).includes(f.q)) && (f.status === 'all' || t.status === f.status) && (f.phase === 'all' || t.phase === f.phase) && (f.region === 'all' || !f.region || (t.region || '国际多中心') === f.region))
     .sort((a, b) => f.sort === 'status' ? a.status.localeCompare(b.status) : f.sort === 'phase' ? a.phase.localeCompare(b.phase) : a.title.localeCompare(b.title));
   return head('检索', '「我要找某个方向/状态/期别」——按你选的条件排列，不掺任何分数。', aiBtn('trial')) +
     `<div class="card"><div class="form-grid" style="grid-template-columns:1fr 1fr 1fr auto;align-items:end">
       <label>关键词<input data-trial-q value="${esc(f.q)}" placeholder="方向 / 申办方 / 编号"></label>
       <label>状态<select data-trial-status><option value="all">全部</option><option value="招募中">招募中</option><option value="进行中·不再招募">进行中·不再招募</option></select></label>
       <label>阶段<select data-trial-phase><option value="all">全部</option><option value="III 期">III 期</option><option value="II 期">II 期</option><option value="观察性">观察性</option></select></label>
+      <label>地区<select data-trial-region><option value="all">全部</option><option value="中国">中国</option><option value="国际多中心">国际多中心</option></select></label>
       <label>排序<select data-trial-sort><option value="status">按状态</option><option value="phase">按期别</option><option value="title">按标题</option></select></label>
       <button data-action="trial-apply" class="primary">按条件检索</button>
     </div><p class="small-note" style="margin-top:8px">双通道：本机快照（虚构示例）+ 在线登记（原型未接入；FAILED 时如实显示「未查过」）。</p></div>
@@ -968,7 +992,8 @@ function settingsBody(tab) {
     <p class="small-note" style="margin-top:10px">口径：资料目录<b>拒绝主目录/桌面/下载根</b>；备份与恢复行装机后可用。</p></div>`;
   if (tab === 'mineru') return `<div class="notice">未勾选同意前：<b>不会上传、不会调用</b>任何解析服务。</div>
     <div class="card" style="margin-top:10px"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" style="width:auto;margin-top:3px" data-mu-consent>我已了解：勾选并保存<b>仅在本机记录同意状态，不联网</b>（本仓未接入 MinerU）。</label>
-    <div class="form-grid" style="margin-top:10px"><label>API Token（掩码）<input value="••••••••••••ab3f" disabled></label>
+    <div class="form-grid" style="margin-top:10px"><label>API Token（掩码，只显后 4 位）<input value="••••••••••••ab3f" disabled></label>
+    <label>替换 Token（未勾选同意前禁用）<input data-mu-replace placeholder="粘贴新 Token（jm_开头）" disabled></label>
     <label>解析模型<input value="pipeline（固定；不可切 VLM——长报告成本与隐私考虑，官方口径）" disabled></label></div>
     <p class="small-note" style="margin-top:8px">Flash 免费额度：单文件 ≤10 MB / ≤20 页；超出自动降级为占位解析（如实提示，不假装解析成功）。</p>
     <p class="small-note" style="margin-top:4px">如何申请：① 打开 MinerU 控制台 → ② 创建 API Token → ③ 复制粘贴到上面 → ④ 保存并测试。</p>
@@ -1026,7 +1051,7 @@ function openForm(kind, pre = {}) {
       ${field('测量日期<input data-f="d" type="date" max="${esc(TODAY)}">')}
       ${field('来源<select data-f="src"><option>家庭自测</option><option>儿保门诊</option><option>内分泌门诊</option><option>其他（在备注写明）</option></select>')}
       ${field('机构<input data-f="org" placeholder="可留空（家庭自测）">')}
-      ${field('备注（可空）<input data-f="note" placeholder="如：哭闹没测准，参考值">')}
+      ${field('可见性<select data-f="visibility"><option value="shared">共享（进一图秀/导出）</option><option value="private">私密（不进图/导出/AI）</option></select>')}
     </div><p class="small-note" style="margin-top:8px">≤6 字段；日期没记可选「日期未记」：改在备注写明。</p>`;
   } else if (kind === 'screening') {
     title = '登记筛查结果';
@@ -1068,6 +1093,19 @@ function openForm(kind, pre = {}) {
       ${field('科室<input data-f="dept" placeholder="如：内分泌科">')}
       ${field('联系方式（电话或「见病历出处」）<input data-f="contact">')}
     </div>`;
+  } else if (kind === 'correct-hospital') {
+    title = `更正：${pre.name}（更正=新增版本）`;
+    body = `<div class="form-grid">
+      ${field('医院名称<input data-f="name" value="${esc(pre.name)}">')}
+      ${field('科室<input data-f="dept" value="${esc(pre.dept)}">')}
+      ${field('联系方式<input data-f="contact" value="${esc(pre.contact)}">')}
+    </div><p class="small-note" style="margin-top:8px">原版本保留可查；本台无「删除」。</p>`;
+  } else if (kind === 'family') {
+    title = '记一条家庭沟通';
+    body = AICAND('visit') + `<div class="form-grid">
+      ${field('日期<input data-f="d" type="date" max="${esc(TODAY)}">')}
+      ${field('事项（照实记）<textarea data-f="item" style="min-height:72px" placeholder="如：和长辈沟通基因检测结果的记录"></textarea>')}
+    </div><p class="small-note" style="margin-top:8px">默认私密：不进看板摘要预览、导出与 AI 上下文（三出口同一过滤）。</p>`;
   } else if (kind === 'question') {
     title = '加一条待问';
     body = AICAND('visit') + `<div class="form-grid">${field('想问的问题<input data-f="q" placeholder="如：下次听力什么时候查？">')}</div>`;
@@ -1099,14 +1137,14 @@ function formCollect() {
 function saveForm(kind, keepOpen) {
   const v = formCollect();
   if (DATA_SOURCE === 'api') {
-    const map = { measure: 'measure', screening: 'screening', surgery: 'surgery', injection: 'injection', question: 'question', doc: 'doc', hospital: 'hospital', 'correct-surgery': 'correct-surgery', 'correct-measure': 'correct-measure' };
-    return apiSaveRecord(map[kind] || kind, { ...v, kind }, '已保存');
+    const map = { measure: 'measure', screening: 'screening', surgery: 'surgery', injection: 'injection', question: 'question', doc: 'doc', hospital: 'hospital', 'correct-surgery': 'correct-surgery', 'correct-measure': 'correct-measure', 'correct-hospital': 'correct-hospital', family: 'family' };
+    return apiSaveRecord(map[kind] || kind, { ...v, kind }, keepOpen ? '已保存，可继续录下一条' : '已保存', keepOpen);
   }
   const m = mem();
   if (kind === 'measure') {
     if (!v.v || isNaN(Number(v.v))) { toast('数值要填数字（或用键盘上的数字键）', { long: true }); return; }
     const dateKnown = !!v.d;
-    m.measures.push({ _id: 'm' + Date.now(), code: v.code, v: Number(v.v), d: dateKnown ? v.d : '（日期未记）', src: v.src, org: v.org || null, note: v.note || null, visibility: 'shared', _v: 1 });
+    m.measures.push({ _id: 'm' + Date.now(), code: v.code, v: Number(v.v), d: dateKnown ? v.d : '（日期未记）', src: v.src, org: v.org || null, note: v.note || null, visibility: v.visibility || 'shared', _v: 1 });
     toast('测量已记录（待核对候选之外的手工录入，同走事实层）', { long: true });
   } else if (kind === 'screening') {
     if (!v.item || !v.result) { toast('项目与结果原文都要填', { long: true }); return; }
@@ -1146,6 +1184,17 @@ function saveForm(kind, keepOpen) {
     if (!mem().hospitals) mem().hospitals = [];
     mem().hospitals.push({ name: v.name, dept: v.dept, contact: v.contact, version: 1 });
     toast('医院已登记（可逐条修改，支持多家）');
+  } else if (kind === 'correct-hospital') {
+    if (!v.name) { toast('医院名称必填', { long: true }); return; }
+    const base = profile().hospitals || [];
+    const target = base[Number(pre.i)];
+    if (target) { target.name = v.name; target.dept = v.dept; target.contact = v.contact; target.version = (target.version || 1) + 1; }
+    m.corrections.push({ refKey: `hosp:${pre.name}:${pre.dept}`, v: (target?.version) || 2, name: v.name, dept: v.dept, contact: v.contact, at: TODAY });
+    toast('已按新版本更正（旧版本可查）', { long: true });
+  } else if (kind === 'family') {
+    if (!v.item) { toast('写一句事项再保存', { long: true }); return; }
+    (p.family.notes = p.family.notes || []).push({ d: v.d || null, item: v.item, visibility: 'private' });
+    toast('已记录（默认私密：不进摘要预览/导出/AI）', { long: true });
   } else if (kind === 'question') {
     if (!v.q) { toast('写一句话再保存', { long: true }); return; }
     allQuestions().push({ q: v.q, asked: false });
@@ -1311,6 +1360,8 @@ document.addEventListener('click', (e) => {
     case 'form-question': openForm('question'); break;
     case 'form-doc': openForm('doc'); break;
     case 'form-hospital': openForm('hospital'); break;
+    case 'correct-hospital': openForm('correct-hospital', { i: t.dataset.i, name: t.dataset.name, dept: t.dataset.dept, contact: t.dataset.contact }); break;
+    case 'hospital-history': openModal('医院历史版本', '<p class="small-note">更正后旧版本保留在库（in_use=0），装机版经「查看历史」接口列出；演示态暂无可查历史。</p>'); break;
     case 'form-save': saveForm(t.dataset.kind, false); break;
     case 'form-save-continue': saveForm(t.dataset.kind, true); break;
     case 'correct-surgery': openForm('correct-surgery', { id: t.dataset.id, name: t.dataset.name, d: t.dataset.d, org: t.dataset.org, quote: t.dataset.quote, v: t.dataset.v }); break;
@@ -1350,7 +1401,7 @@ document.addEventListener('click', (e) => {
     case 'trial-detail': trialDetailPane(t.dataset.key); break;
     case 'trial-save': mem().savedTrials.push({ key: t.dataset.key, savedOn: TODAY, state: '在跟' }); { const mask = $('.trial-mask'); if (mask) mask.parentElement._close(); } toast('已收藏（只存本机）'); render(); break;
     case 'trial-unsave': mem().savedTrials = mem().savedTrials.filter((s) => s.key !== t.dataset.key); render(); break;
-    case 'trial-apply': { state.trialFilter.q = $('[data-trial-q]')?.value || ''; state.trialFilter.status = $('[data-trial-status]')?.value || 'all'; state.trialFilter.phase = $('[data-trial-phase]')?.value || 'all'; state.trialFilter.sort = $('[data-trial-sort]')?.value || 'status'; render(); toast('已按你选的条件排列（不掺分数）'); break; }
+    case 'trial-apply': { state.trialFilter.q = $('[data-trial-q]')?.value || ''; state.trialFilter.status = $('[data-trial-status]')?.value || 'all'; state.trialFilter.phase = $('[data-trial-phase]')?.value || 'all'; state.trialFilter.region = $('[data-trial-region]')?.value || 'all'; state.trialFilter.sort = $('[data-trial-sort]')?.value || 'status'; render(); toast('已按你选的条件排列（不掺分数）'); break; }
     default: break;
   }
 });

@@ -102,7 +102,7 @@ function readProfile(db, key, opts = {}) {
       .map((r) => ({ id: r.cand_id ?? String(r.rowid ?? ''), kind: r.kind, title: r.title, fields: jp(r.fields_json, []), src: r.src ?? null })),
     questions: rows(db, 'SELECT q, asked FROM question_rows WHERE profile_key = ? ORDER BY ord, rowid', key)
       .map((r) => ({ q: r.q, asked: !!r.asked })),
-    hospitals: rows(db, 'SELECT name, dept, contact, version FROM hospitals WHERE profile_key = ? ORDER BY rowid', key)
+    hospitals: rows(db, 'SELECT name, dept, contact, version FROM hospitals WHERE profile_key = ? AND in_use = 1 ORDER BY rowid', key)
       .map((r) => ({ name: r.name, dept: r.dept, contact: r.contact, version: r.version })),
     family: {
       /* notes 原样返回（私密过滤在前端三出口 sharedOnly 做；服务端导出侧另行整段排除） */
@@ -129,8 +129,8 @@ export function getProfile(db, key, opts = {}) {
 /** `/api/bootstrap` 的 payload。version/build 由调用方注入（唯一来源 lib/version.js）。 */
 export function bootstrap(db, { version, build } = {}) {
   const profiles = listSubjects(db).map((s) => readProfile(db, s.profile_key))
-  const trials = rows(db, 'SELECT key, title, nct_like, phase, status, sponsor, sites, age_min, age_max, needs_open_epiphysis, requires_condition, ambulatory FROM trials ORDER BY rowid')
-    .map((r) => ({ key: r.key, title: r.title, nctLike: r.nct_like, phase: r.phase, status: r.status, sponsor: r.sponsor, sites: r.sites, ageMin: r.age_min, ageMax: r.age_max, needsOpenEpiphysis: !!r.needs_open_epiphysis, requiresDiagnosis: r.requires_condition, ambulatory: !!r.ambulatory }))
+  const trials = rows(db, 'SELECT key, title, nct_like, phase, status, sponsor, region, sites, age_min, age_max, needs_open_epiphysis, requires_condition, ambulatory FROM trials ORDER BY rowid')
+    .map((r) => ({ key: r.key, title: r.title, nctLike: r.nct_like, phase: r.phase, status: r.status, sponsor: r.sponsor, region: r.region ?? '国际多中心', sites: r.sites, ageMin: r.age_min, ageMax: r.age_max, needsOpenEpiphysis: !!r.needs_open_epiphysis, requiresDiagnosis: r.requires_condition, ambulatory: !!r.ambulatory }))
   let meta = {}
   const dm = rows(db, 'SELECT disclaimers_json FROM demo_meta ORDER BY rowid')
   if (dm.length) meta = jp(dm[0].disclaimers_json, {}) ?? {}
@@ -161,6 +161,14 @@ const CORRECT_KINDS = {
       .run(p.profileId, old.surg_id, String(p.name ?? old.name), String(p.d ?? old.d), p.org || old.org, p.quote ?? old.doctor_quote, old.version + 1)
     return { ok: true, kind: 'correct-surgery', version: old.version + 1 }
   },
+  'correct-hospital': (db, p) => {
+    const old = db.prepare('SELECT * FROM hospitals WHERE profile_key = ? AND name = ? AND dept = ? AND in_use = 1 ORDER BY rowid DESC LIMIT 1').get(p.profileId, p.name, p.dept || null)
+    if (!old) throw Object.assign(new Error('找不到要更正的医院记录'), { status: 404 })
+    db.prepare('UPDATE hospitals SET in_use = 0 WHERE id = ?').run(old.id)
+    db.prepare('INSERT INTO hospitals (profile_key, name, dept, contact, version, in_use) VALUES (?,?,?,?,?,1)')
+      .run(p.profileId, String(p.name ?? old.name), p.dept || old.dept, p.contact ?? old.contact, old.version + 1)
+    return { ok: true, kind: 'correct-hospital', version: old.version + 1 }
+  },
   'correct-measure': (db, p) => {
     /* 测量更正：新增 version=2 行（corrected_from + why），读模型按 (code,d) 取最新版本 */
     const base = db.prepare('SELECT id FROM metric_points WHERE profile_key = ? AND code = ? AND d = ? ORDER BY rowid DESC LIMIT 1').get(p.profileId, p.code, p.d)
@@ -182,9 +190,14 @@ export const RECORD_KINDS = {
       d: p.d && ISO.test(p.d) ? p.d : null, d_precision: p.d && ISO.test(p.d) ? 'day' : 'unknown',
       v: p.v === '' || p.v === undefined || isNaN(Number(p.v)) ? null : Number(p.v),
       v_text: typeof p.v === 'string' && isNaN(Number(p.v)) ? p.v : null,
-      src: p.src ?? null, org: p.org || null, note: p.note || null, visibility: 'shared', version: 1,
+      src: p.src ?? null, org: p.org || null, note: p.note || null, visibility: p.visibility === 'private' ? 'private' : 'shared', version: 1,
     }),
   },
+  family: {
+    table: 'viewpoints',
+    cols: (p) => ({ profile_key: p.profileId, d: p.d && ISO.test(p.d) ? p.d : null, item: String(p.item ?? ''), visibility: 'private' }),
+  },
+  'correct-hospital': { custom: 'correct-hospital' },
   screening: {
     table: 'screening_rows',
     cols: (p) => ({ profile_key: p.profileId, cat: String(p.cat ?? 'hearing'), item: String(p.item ?? ''), result_text: String(p.result ?? ''), d: p.d && ISO.test(p.d) ? p.d : null, org: p.org || null, visibility: 'shared', version: 1 }),
@@ -218,7 +231,7 @@ export function saveRecord(db, kind, payload = {}) {
   const cols = def.cols(payload)
   const keys = Object.keys(cols)
   if (!cols.profile_key) throw Object.assign(new Error('缺少 profileId'), { status: 400 })
-  const need = { measure: ['code'], screening: ['item', 'result_text'], surgery: ['name', 'd'], injection: ['d'], question: ['q'], doc: ['name'], hospital: ['name'] }[kind] ?? []
+  const need = { measure: ['code'], screening: ['item', 'result_text'], surgery: ['name', 'd'], injection: ['d'], question: ['q'], doc: ['name'], hospital: ['name'], family: ['item'] }[kind] ?? []
   for (const k of need) if (cols[k] === null || cols[k] === '' || cols[k] === undefined) throw Object.assign(new Error('必填字段缺失'), { status: 400 })
   db.prepare(`INSERT INTO ${def.table} (${keys.join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`).run(...keys.map((k) => cols[k]))
   return { ok: true, kind }

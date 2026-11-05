@@ -55,8 +55,8 @@ export function seedInto(db, data = buildDemoProfiles()) {
     const insHosp = db.prepare('INSERT INTO hospitals (profile_key, name, dept, contact, version, in_use) VALUES (?,?,?,?,?,1)')
     const insView = db.prepare('INSERT INTO viewpoints (profile_key, d, item, visibility, in_use) VALUES (?,?,?,?,1)')
     const insTrial = db.prepare(`INSERT INTO trials
-      (key, title, nct_like, phase, status, sponsor, sites, age_min, age_max, needs_open_epiphysis, requires_condition, ambulatory, snapshot_date, in_use)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)`)
+      (key, title, nct_like, phase, status, sponsor, region, sites, age_min, age_max, needs_open_epiphysis, requires_condition, ambulatory, snapshot_date, in_use)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`)
     const insDemoMeta = db.prepare('INSERT INTO demo_meta (profile_key, data_start, today, disclaimers_json) VALUES (?,?,?,?)')
 
     for (const p of data.profiles) {
@@ -101,7 +101,7 @@ export function seedInto(db, data = buildDemoProfiles()) {
       }))
     }
     for (const t of data.trials ?? []) {
-      insTrial.run(t.key, t.title, t.nctLike ?? null, t.phase ?? null, t.status ?? null, t.sponsor ?? null,
+      insTrial.run(t.key, t.title, t.nctLike ?? null, t.phase ?? null, t.status ?? null, t.sponsor ?? null, t.region ?? null,
         t.sites ?? null, t.ageMin ?? null, t.ageMax ?? null, t.needsOpenEpiphysis ? 1 : 0, t.requiresDiagnosis ?? null, t.ambulatory ? 1 : 0, data.snapshot?.date ?? null)
     }
     db.exec('COMMIT')

@@ -21,6 +21,14 @@
 | 10 | 本仓实现 | 指标卡背面=最近几次迷你折线 sparkline + 首末日期（小粉宝同款；单点卡显「只有 1 次记录，暂不连线」） | UI parity |
 | 11 | 本仓探针 | C2 断言收窄到数据点层（`[data-point]` 圆），事件带另计——画布引入事件层后原断言会误数 | 探针适配 |
 
+## 第三轮回流（2026-11-06 FAMILY-INSPECTOR 全量轮，M6 对齐后）
+
+| # | 去向 | 内容 | 类型 |
+| --- | --- | --- | --- |
+| 12 | 本仓 test/f3-keepopen.test.mjs | 「api 态保存并继续录入不关窗」真实链路探针（dev-server 临时工作区 + 浏览器断言 dialog stillOpen + 输入清空 + 行数 +1）——Inspector 抓到的 F3 回归从此有闸口 | **可断言** |
+| 13 | 本仓 app.js | apiSaveRecord keepOpen 贯通（F3）、医院修改=新版本+历史接口（F6）、一图秀私密 N 条不含+measure 可见性开关+图表过滤（D5）、检索地区维度（E2，0005 迁移）、家庭沟通记录卡+表单（F2）、MinerU 替换 Token 禁用态（C3）、声明条版本字面（A4）、菜单裁剪表（B1） | 修复 |
+| 14 | starter 候选（未回流） | 「分组属性拍平 3D」探针加固：断言 .mcard-inner 无 overflow/clip-path/filter/mask（L64 的可断言化） | 待实施 |
+
 ## 检查器待实施清单（追加；谁能断言谁写）
 
 1. probe-one-chart 本仓已覆盖 C1–C6/C4 路径断言（probe-ach-m2），家族级 `templates/probe-one-chart.mjs` 仍待抽象（对照小粉宝口径：getBBox 高度比、翻转 rect 四值、matrix3d 前缀）。

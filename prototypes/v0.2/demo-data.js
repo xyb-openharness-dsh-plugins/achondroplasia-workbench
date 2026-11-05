@@ -264,10 +264,10 @@ window.DEMO_DATA = {
   ],
   /* 临床试验（虚构示例：不是真实研究，不含可用登记号；E2/E7 红线） */
   trials: [
-    { key: 'T-DEMO-01', title: '一项在软骨发育不全儿童中评价每日皮下注射药物生长效应的研究（虚构示例）', nctLike: 'NCT-示例-001（虚构）', phase: 'III 期', status: '招募中', sponsor: '某研究所（虚构）', sites: 12, ageMin: 2, ageMax: 10, needsOpenEpiphysis: true, requiresDiagnosis: '临床/基因确诊软骨发育不全', ambulatory: false },
-    { key: 'T-DEMO-02', title: '软骨发育不全婴儿（0–3 岁）给药安全性研究（虚构示例）', nctLike: 'NCT-示例-002（虚构）', phase: 'II 期', status: '招募中', sponsor: '某医院（虚构）', sites: 5, ageMin: 0, ageMax: 3, needsOpenEpiphysis: true, requiresDiagnosis: '基因确诊', ambulatory: false },
-    { key: 'T-DEMO-03', title: '软骨发育不全青少年开放骨骺期研究（虚构示例）', nctLike: 'NCT-示例-003（虚构）', phase: 'II 期', status: '进行中·不再招募', sponsor: '某大学（虚构）', sites: 8, ageMin: 10, ageMax: 16, needsOpenEpiphysis: true, requiresDiagnosis: '临床确诊', ambulatory: true },
-    { key: 'T-DEMO-04', title: '软骨发育不全成人腰椎管狭窄自然史登记（虚构示例）', nctLike: 'NCT-示例-004（虚构）', phase: '观察性', status: '招募中', sponsor: '某中心（虚构）', sites: 20, ageMin: 18, ageMax: 65, needsOpenEpiphysis: false, requiresDiagnosis: '临床/基因确诊', ambulatory: false }
+    { key: 'T-DEMO-01', title: '一项在软骨发育不全儿童中评价每日皮下注射药物生长效应的研究（虚构示例）', nctLike: 'NCT-示例-001（虚构）', phase: 'III 期', status: '招募中', sponsor: '某研究所（虚构）', region: '国际多中心', sites: 12, ageMin: 2, ageMax: 10, needsOpenEpiphysis: true, requiresDiagnosis: '临床/基因确诊软骨发育不全', ambulatory: false },
+    { key: 'T-DEMO-02', title: '软骨发育不全婴儿（0–3 岁）给药安全性研究（虚构示例）', nctLike: 'NCT-示例-002（虚构）', phase: 'II 期', status: '招募中', sponsor: '某医院（虚构）', region: '中国', sites: 5, ageMin: 0, ageMax: 3, needsOpenEpiphysis: true, requiresDiagnosis: '基因确诊', ambulatory: false },
+    { key: 'T-DEMO-03', title: '软骨发育不全青少年开放骨骺期研究（虚构示例）', nctLike: 'NCT-示例-003（虚构）', phase: 'II 期', status: '进行中·不再招募', sponsor: '某大学（虚构）', region: '国际多中心', sites: 8, ageMin: 10, ageMax: 16, needsOpenEpiphysis: true, requiresDiagnosis: '临床确诊', ambulatory: true },
+    { key: 'T-DEMO-04', title: '软骨发育不全成人腰椎管狭窄自然史登记（虚构示例）', nctLike: 'NCT-示例-004（虚构）', phase: '观察性', status: '招募中', sponsor: '某中心（虚构）', region: '中国', sites: 20, ageMin: 18, ageMax: 65, needsOpenEpiphysis: false, requiresDiagnosis: '临床/基因确诊', ambulatory: false }
   ],
   snapshot: { source: '虚构示例快照（原型）', date: '2026-11-05', note: '快照只存登记的结构化字段；入排标准原文请到官方登记页核对；快照会过期。' }
 };
