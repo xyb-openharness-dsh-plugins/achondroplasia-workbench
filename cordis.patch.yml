@@ -1,0 +1,6 @@
+- insert:
+    - id: achondroplasia-main
+      name: "@xyb-community/achondroplasia-workbench"
+      # 服务端声明数据根目录：DSH_HOME 下按 slug 隔离的资料目录
+      config:
+        root: !!js dshHomePath('achondroplasia')
