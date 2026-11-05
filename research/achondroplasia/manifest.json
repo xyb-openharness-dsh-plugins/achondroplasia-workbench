@@ -1,0 +1,45 @@
+{
+  "topic": "achondroplasia",
+  "year": "2026",
+  "snapshotDate": "2026-11-06",
+  "tool": "unified-trial-mcp @ /Users/qinxiaoqiang/Downloads/unified_search_trials/dist/src/cli/main.js",
+  "queries": [
+    {
+      "keyword": "软骨发育不全",
+      "note": "中文标准名"
+    },
+    {
+      "keyword": "achondroplasia",
+      "note": "英文标准名"
+    },
+    {
+      "keyword": "FGFR3",
+      "note": "致病基因关键词（药物研究方向）"
+    },
+    {
+      "keyword": "骨骼发育不良",
+      "note": "上位词宽检索（去重靠登记号）"
+    },
+    {
+      "keyword": "软骨发育不良",
+      "note": "中文别名"
+    }
+  ],
+  "perSourceLimit": 200,
+  "recordCount": 150,
+  "dbCount": 150,
+  "sourceStatusRows": 30,
+  "honesty": {
+    "offlineCorpora": "ChiCTR/CDE/CTV 离线语料仅胰腺癌覆盖；软骨发育不全只依赖在线通道终态，见 source_statuses 表",
+    "statusWording": "登记 ≠ 有效 ≠ 安全 ≠ 可入组；状态一律\"登记状态，未核实\"",
+    "mergeRule": "仅同一登记号（NCT/ChiCTR/CDE 等）合并，其余并排保留来源"
+  },
+  "files": {
+    "trials-2026.jsonl": {
+      "sha256": "daa101332c653bc41ba545b6ccf6474748eaeae33d4027bb8d7e17a539573fc0"
+    },
+    "achondroplasia_trials_2026.sqlite": {
+      "sha256": "7ce9e3e1fbaf12cd00835026d496679293899f0f8e9650bc9175f3f44e73a649"
+    }
+  }
+}
