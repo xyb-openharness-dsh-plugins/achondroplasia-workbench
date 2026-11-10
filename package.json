@@ -1,6 +1,6 @@
 {
   "name": "@xyb-community/achondroplasia-workbench",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "本机优先的软骨发育不全患儿家庭工作台：生长记录（身高/体重/头围，年龄性别分层对照）、年度并发症筛查（颅颈交界/睡眠呼吸暂停/中耳听力/脊柱/下肢对线）、手术与用药事件档案、就诊资料包与代记视角",
   "private": true,
   "type": "module",
@@ -35,7 +35,7 @@
     "check:coverage": "node scripts/check-probe-coverage.mjs",
     "check:version": "node scripts/check-version.mjs",
     "test": "node --disable-warning=ExperimentalWarning --test test/*.test.mjs",
-    "check": "npm run build:version && npm run build:demo && node scripts/check-version.mjs && node scripts/check-syntax.mjs && node scripts/check-schema.mjs . && node scripts/check-wording.mjs . && node scripts/check-demo-columns.mjs . && node scripts/build-client.mjs --check && node --disable-warning=ExperimentalWarning --test test/*.test.mjs && node scripts/check-workbench-package.mjs . && node scripts/check-host-contract.mjs && node scripts/smoke-activate.mjs && node scripts/check-probe-coverage.mjs && node scripts/check-static-refs.mjs && node scripts/check-choice-limit.mjs && node scripts/check-assertion-strength.mjs && node scripts/check-derivative-leftovers.mjs . && node scripts/check-trial-snapshot.mjs . --if-present && node scripts/check-trial-matching.mjs . && node scripts/check-primer-links.mjs",
+    "check": "npm run build:version && npm run build:demo && node scripts/check-version.mjs && node scripts/check-syntax.mjs && node scripts/check-schema.mjs . && node scripts/check-wording.mjs . && node scripts/check-demo-columns.mjs . && node scripts/build-client.mjs --check && node --disable-warning=ExperimentalWarning --test test/*.test.mjs && node scripts/check-workbench-package.mjs . && node scripts/check-host-contract.mjs && node scripts/smoke-activate.mjs && node scripts/check-probe-coverage.mjs && node scripts/check-static-refs.mjs && node scripts/check-choice-limit.mjs && node scripts/check-assertion-strength.mjs && node scripts/check-derivative-leftovers.mjs . && node scripts/check-trial-snapshot.mjs . --if-present && node scripts/check-trial-matching.mjs . && node scripts/check-primer-links.mjs && node scripts/check-agent-pane-contract.mjs .",
     "audit": "node scripts/check-conformance.mjs .",
     "release:check": "npm run check && npm run audit",
     "start": "node --disable-warning=ExperimentalWarning scripts/dev-server.mjs",

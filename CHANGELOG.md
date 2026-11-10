@@ -1,3 +1,11 @@
+## 0.2.1（2026-11-11，AI 对话面板激活修复）
+
+- 会话判定改用宿主归属 `ownedSession()`（`ownsSession(currentSession())`），不再用 `Boolean(conversation)`（customFrame 下没会话也会传隐藏容器，判断恒为真 → 点了没反应）。
+- 创建路径改为 `service.newSession(workspaceId)`，工作区取 `service.defaultWorkspace?.()?.workspaceId`；不传可用工作区时由宿主提示选目录；不再调用 `ensureSession({})`。
+- 取消目录选择不留空会话并提示可重试；创建失败在工作台内显示原因；订阅会话变化触发重渲染；草稿仍只填不发。
+- 装机与实机验证待人工
+- 验证：`check-agent-pane-contract` 通过；生成物与页面版本同步 0.2.1；**界面加载与真机点击待人工**（需重开 DSH Desktop）。
+
 # CHANGELOG · 小苗宝 GrowPal
 
 ## 0.2.0（2026-11-06 夜班）
