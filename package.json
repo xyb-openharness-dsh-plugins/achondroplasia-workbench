@@ -1,6 +1,6 @@
 {
   "name": "@xyb-community/achondroplasia-workbench",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "本机优先的软骨发育不全患儿家庭工作台：生长记录（身高/体重/头围，年龄性别分层对照）、年度并发症筛查（颅颈交界/睡眠呼吸暂停/中耳听力/脊柱/下肢对线）、手术与用药事件档案、就诊资料包与代记视角",
   "private": true,
   "type": "module",

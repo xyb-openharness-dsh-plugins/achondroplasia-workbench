@@ -25,7 +25,7 @@ const read = (p) => readFileSync(join(root, p), 'utf8')
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/
 
 /** 原型快照的版本：G1/G2 签认时的那个号。重冻结须同时改原型字面量与本常量，并在 CHANGELOG 记录（D37）。 */
-const FROZEN_PROTOTYPE = '0.2.1' // 2026-11-11 重冻结：仅版本字面量随包前移，渲染内容未变（AI 面板修复不涉 UI）
+const FROZEN_PROTOTYPE = '0.2.2' // 2026-11-11 重冻结：仅版本字面量随包前移，渲染内容未变（AI 面板修复不涉 UI）
 
 const problems = []
 const checks = []

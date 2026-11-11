@@ -109,6 +109,7 @@ export function createHandler({ workbench }) {
   const api = createApiHandler({
     source: {
       db: workbench.db,
+      workspace: () => (typeof workbench.workspaceInfo === 'function' ? workbench.workspaceInfo() : { mode: 'demo', root: null, file: null }),
       bootstrap: () => workbench.bootstrap(),
       profile: (key, opts) => workbench.getProfile(key, opts),
       saveExport: (key) => workbench.saveExport(key),

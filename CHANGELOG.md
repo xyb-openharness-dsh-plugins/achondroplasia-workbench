@@ -18,3 +18,9 @@
 
 ## 0.1.0（2026-11-05 夜班）
 - 包版本 0.1.0（脚手架 init 218 文件）：DSH 注册、health 接口、版本展示、标准/大字切换；无业务数据库
+## 0.2.2（2026-11-12，装机三问题修复：AI 对话入口 / 资料目录 / 新建档案）
+
+- **首页 AI 对话**：顶栏按钮在嵌入式（DSK Desktop 壳层）改为向宿主帧 postMessage `achondroplasia:agent-open`（携带当前页默认提示词+档案上下文，只填不发），由宿主机拉起原生对话面板并填入草稿；独立打开仍是演示面板。**同时修复宿主帧监听的消息类型写成 `cervi:agent-draft`（业务页发 `achondroplasia:agent-draft`，桥一直全哑）**。
+- **资料目录**：装机态新增 `GET /settings/workspace`（真实路径/数据库文件/体积/可写/表数/迁移账本）并替换原「原型演示」弹窗；「复制路径」；位置变更说明归宿主侧。演示态保留如实标注。
+- **新建档案与管理**：`0006_subjects_manage.sql`（subjects.in_use/archived_at）+ `POST /profiles`（create/rename/archive/restore，无裸删除）+ `GET /profiles`（在用/已归档）；切换器改为「＋ 新建档案」+ 管理当前档案（重命名/归档）+ 归档区恢复；新建档案从空状态开始（空态 CTA 齐备），装机态写入本机库，演示态仅内存并如实提示。
+- 验证：check 全链、audit、探针；dev-server 实测 create→bootstrap→空档案看板；装机态模拟（/ui/ 子路径）模板不 404。

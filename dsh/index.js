@@ -70,6 +70,7 @@ export function apply(ctx, config = {}) {
   const api = createApiHandler({
     source: source ?? {
       db: null,
+      workspace: () => ({ mode: 'demo', root: null, file: null }),
       bootstrap: () => { throw new Error(failure) },
       profile: () => null,
     },

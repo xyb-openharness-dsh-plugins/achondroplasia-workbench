@@ -59,6 +59,8 @@ export class Workbench {
   get displayVersion() { return displayVersion; }
   get build() { return build; }
   get workspace() { return this.#workspace; }
+  /** 资料目录真实信息（/settings/workspace 用）：位置 + 库文件。 */
+  workspaceInfo() { return { mode: 'dsh', root: this.#workspace, file: join(this.#workspace, DB_FILE) }; }
   get db() { return this.#db; }
 
   bootstrap() { return bootstrap(this.#db, { version, build }); }

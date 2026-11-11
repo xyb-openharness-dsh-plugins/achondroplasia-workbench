@@ -118,8 +118,82 @@ function readProfile(db, key, opts = {}) {
   return profile
 }
 
-export function listSubjects(db) {
-  return rows(db, 'SELECT profile_key, name FROM subjects ORDER BY rowid')
+export function listSubjects(db, { includeArchived = false } = {}) {
+  const sql = includeArchived
+    ? 'SELECT profile_key, name, in_use, archived_at FROM subjects ORDER BY rowid'
+    : 'SELECT profile_key, name FROM subjects WHERE in_use = 1 ORDER BY rowid'
+  return rows(db, sql)
+}
+
+/* ---------------- 档案管理（新建/重命名/归档/恢复；无裸删除） ---------------- */
+const METRIC_DEFAULTS = [
+  ['HEIGHT', '身长/身高', 'cm', '体格生长', '#2f6b40', 1, '测量方式（卧式身长/立式身高）不同时不跨组连线、不做差（口径见页内说明）。'],
+  ['WEIGHT', '体重', 'kg', '体格生长', '#b06a28', 1, '衣物差异会让家庭自测与门诊值不可比；并列展示不合并。'],
+  ['HEAD', '头围', 'cm', '体格生长', '#2f7d6b', 1, '软骨发育不全专用头围曲线与普通曲线不同；本台只并列记录，不判读。'],
+  ['BMIW', '身高别体重', null, '其他测量', '#7c6aae', 1, '参考口径【待核】；记录项不判定体型。'],
+]
+const SECTION_TITLES = [['体格生长', '体格生长（身长/体重/头围）'], ['其他测量', '其他测量'], ['hearing', '听力与中耳'], ['sleep', '睡眠与呼吸'], ['craniocervical', '颅颈与神经'], ['spine', '脊柱'], ['legs', '下肢对线'], ['events', '手术与用药事件'], ['hospitals', '就诊医院']]
+
+/** 新建档案（真实写入本机库；幂等 key 生成 p<timestamp>）。返回 { profileKey, name }。 */
+export function createProfile(db, input = {}) {
+  const name = String(input.name ?? '').trim()
+  if (!name) throw Object.assign(new Error('档案称呼必填'), { status: 400 })
+  const today = new Date().toISOString().slice(0, 10)
+  const key = `p${Date.now()}`
+  const careRole = input.careRole === 'patient' ? 'patient' : 'caregiver'
+  const ageLabel = String(input.ageLabel ?? '').trim() || null
+  db.exec('BEGIN')
+  try {
+    db.prepare(`INSERT INTO subjects
+      (profile_key, name, sex, age_label, age_months, care_role, headline, status_note, anchor_label, anchor_date, next_visit, doctor_quote, genetics_note, notes, created_at, in_use)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)`).run(
+      key, name, input.sex || null, ageLabel, null, careRole,
+      input.headline || '新建档案 · 待记录', '新建档案 · 待记录', '距建档', today,
+      '下次随访待约（以预约为准）', null, null, null, today,
+    )
+    const insMetric = db.prepare('INSERT INTO metrics (profile_key, code, name, unit, cat, color, dec, note, in_use) VALUES (?,?,?,?,?,?,?,?,1)')
+    for (const m of METRIC_DEFAULTS) insMetric.run(key, ...m)
+    const insTitle = db.prepare('INSERT INTO section_titles (profile_key, key, title, ord) VALUES (?,?,?,?)')
+    SECTION_TITLES.forEach(([k, t], i) => insTitle.run(key, k, t, i))
+    const insMeta = db.prepare('INSERT INTO profile_meta (profile_key, k, v) VALUES (?,?,?)')
+    insMeta.run(key, 'anchor_days', '0')
+    insMeta.run(key, 'age_label', ageLabel ?? '')
+    insMeta.run(key, 'mode_note', '新建档案：先记录，随访节奏问医生。')
+    insMeta.run(key, 'scene_title', '现在到哪一步了')
+    db.exec('COMMIT')
+  } catch (e) {
+    try { db.exec('ROLLBACK') } catch { /* 保留原错误 */ }
+    throw e
+  }
+  return { profileKey: key, name }
+}
+
+export function renameProfile(db, key, name) {
+  const next = String(name ?? '').trim()
+  if (!next) throw Object.assign(new Error('档案称呼必填'), { status: 400 })
+  const r = db.prepare('UPDATE subjects SET name = ? WHERE profile_key = ? AND in_use = 1').run(next, key)
+  if (!r.changes) throw Object.assign(new Error('档案不存在或已归档'), { status: 404 })
+  return { profileKey: key, name: next }
+}
+
+export function archiveProfile(db, key) {
+  const r = db.prepare("UPDATE subjects SET in_use = 0, archived_at = ? WHERE profile_key = ? AND in_use = 1").run(new Date().toISOString(), key)
+  if (!r.changes) throw Object.assign(new Error('档案不存在或已归档'), { status: 404 })
+  return { profileKey: key, archived: true }
+}
+
+export function restoreProfile(db, key) {
+  const r = db.prepare('UPDATE subjects SET in_use = 1, archived_at = NULL WHERE profile_key = ?').run(key)
+  if (!r.changes) throw Object.assign(new Error('档案不存在'), { status: 404 })
+  return { profileKey: key, restored: true }
+}
+
+/** 切换列表：在用档案 + 归档数（管理界面用）。 */
+export function profileDirectory(db) {
+  return {
+    active: rows(db, 'SELECT profile_key AS profileKey, name, care_role AS careRole FROM subjects WHERE in_use = 1 ORDER BY rowid'),
+    archived: rows(db, 'SELECT profile_key AS profileKey, name, archived_at AS archivedAt FROM subjects WHERE in_use = 0 ORDER BY rowid'),
+  }
 }
 
 export function getProfile(db, key, opts = {}) {

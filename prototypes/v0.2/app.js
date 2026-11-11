@@ -13,7 +13,7 @@
    - 非肿瘤红线：无「达标/落后」判定、无风险评分；阈值与频次一律【待核】或医生原话。 */
 'use strict';
 const $ = (s, r = document) => r.querySelector(s);
-const APP_INFO = { name: '小苗宝 GrowPal', version: '0.2.1', build: '2026-11-06' };
+const APP_INFO = { name: '小苗宝 GrowPal', version: '0.2.2', build: '2026-11-06' };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dOf = (d) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : null);
 const fmtD = (d) => (d && d.length >= 10 ? d.slice(0, 10) : String(d ?? ''));
@@ -155,7 +155,9 @@ function apiSaveRecord(kind, payload, okMsg, keepOpen = false) {
     .catch((e) => { if (!keepOpen) closeModal(); toast('未保存：' + e.message, { long: true }) })
   return true
 }
-const mem = () => state.mem[state.profileId];
+const MEM_DEFAULT = () => ({ measures: [], screenings: [], surgeries: [], injections: [], corrections: [], savedTrials: [], acceptedCands: [], questions: null, hospitals: [] });
+/* 档案 id 可能来自新建/恢复（state.mem 里没有预置槽）——惰性初始化，别对 undefined 取字段 */
+const mem = () => (state.mem[state.profileId] || (state.mem[state.profileId] = MEM_DEFAULT()));
 /* private 三出口共用（Q35/H1）：看板摘要预览、导出、AI 上下文全部走 sharedOnly */
 const sharedOnly = (list) => (list || []).filter((v) => v.visibility !== 'private');
 const privateCount = (list) => (list || []).filter((v) => v.visibility === 'private').length;
@@ -1101,6 +1103,17 @@ function openForm(kind, pre = {}) {
       ${field('科室<input data-f="dept" value="${esc(pre.dept)}">')}
       ${field('联系方式<input data-f="contact" value="${esc(pre.contact)}">')}
     </div><p class="small-note" style="margin-top:8px">原版本保留可查；本台无「删除」。</p>`;
+  } else if (kind === 'profile') {
+    title = '新建档案';
+    body = `<div class="form-grid">
+      ${field('孩子称呼 / 档案名<input data-f="name" placeholder="如：小禾">')}
+      ${field('性别<select data-f="sex"><option value="">未记录</option><option>女</option><option>男</option></select>')}
+      ${field('年龄标签<input data-f="ageLabel" placeholder="如：3 岁 2 月（可留空）">')}
+      ${field('记录角色<select data-f="careRole"><option value="caregiver">家长代记</option><option value="patient">本人查看</option></select>')}
+    </div><p class="small-note" style="margin-top:8px">新建后从空开始：先记一次测量；筛查、事件、就诊准备各自录入。装机态写入本机资料目录。</p>`;
+  } else if (kind === 'rename-profile') {
+    title = '重命名档案';
+    body = `<div class="form-grid">${field('档案称呼<input data-f="name" value="${esc(pre.name)}">')}</div><p class="small-note" style="margin-top:8px">只改称呼，不改任何记录。</p>`;
   } else if (kind === 'family') {
     title = '记一条家庭沟通';
     body = AICAND('visit') + `<div class="form-grid">
@@ -1137,6 +1150,42 @@ function formCollect() {
 }
 function saveForm(kind, keepOpen) {
   const v = formCollect();
+  /* 档案管理类（新建/重命名）走 /profiles，不进 /records 映射 */
+  if (kind === 'profile') {
+    if (!v.name) { toast('孩子称呼必填', { long: true }); return }
+    if (DATA_SOURCE === 'api') {
+      void apiPostJson('/profiles', { action: 'create', name: v.name, sex: v.sex || null, ageLabel: v.ageLabel || null, careRole: v.careRole })
+        .then(async (r) => {
+          closeModal()
+          DATA_SOURCE = await loadBootstrap()
+          state.profileId = r.profileKey
+          applySourceBanner()
+          render(true)
+          toast(`已新建档案「${r.name}」（写入本机资料目录）`, { long: true })
+        })
+        .catch((e) => toast('未新建：' + e.message, { long: true }))
+      return
+    }
+    const np = blankProfile(v.name, v.sex, v.ageLabel, v.careRole)
+    DATA.profiles.push(np)
+    closeModal()
+    useProfile(np.id)
+    toast('已新建（演示态：仅内存，刷新重置；装机后写入本机库）', { long: true })
+    return
+  }
+  if (kind === 'rename-profile') {
+    if (!v.name) { toast('档案称呼必填', { long: true }); return }
+    if (DATA_SOURCE === 'api') {
+      void apiPostJson('/profiles', { action: 'rename', profileKey: pre.id, name: v.name })
+        .then(async () => { closeModal(); await apiRefetch(); toast('已重命名', { long: true }) })
+        .catch((e) => toast('未重命名：' + e.message, { long: true }))
+      return
+    }
+    const target = DATA.profiles.find((x) => x.id === pre.id)
+    if (target) target.name = v.name
+    toast('已重命名（演示态仅内存）')
+    return
+  }
   if (DATA_SOURCE === 'api') {
     const map = { measure: 'measure', screening: 'screening', surgery: 'surgery', injection: 'injection', question: 'question', doc: 'doc', hospital: 'hospital', 'correct-surgery': 'correct-surgery', 'correct-measure': 'correct-measure', 'correct-hospital': 'correct-hospital', family: 'family' };
     return apiSaveRecord(map[kind] || kind, { ...v, kind }, keepOpen ? '已保存，可继续录下一条' : '已保存', keepOpen);
@@ -1192,6 +1241,17 @@ function saveForm(kind, keepOpen) {
     if (target) { target.name = v.name; target.dept = v.dept; target.contact = v.contact; target.version = (target.version || 1) + 1; }
     m.corrections.push({ refKey: `hosp:${pre.name}:${pre.dept}`, v: (target?.version) || 2, name: v.name, dept: v.dept, contact: v.contact, at: TODAY });
     toast('已按新版本更正（旧版本可查）', { long: true });
+  } else if (kind === 'profile') {
+    title = '新建档案';
+    body = `<div class="form-grid">
+      ${field('孩子称呼 / 档案名<input data-f="name" placeholder="如：小禾">')}
+      ${field('性别<select data-f="sex"><option value="">未记录</option><option>女</option><option>男</option></select>')}
+      ${field('年龄标签<input data-f="ageLabel" placeholder="如：3 岁 2 月（可留空）">')}
+      ${field('记录角色<select data-f="careRole"><option value="caregiver">家长代记</option><option value="patient">本人查看</option></select>')}
+    </div><p class="small-note" style="margin-top:8px">新建后从空开始：先记一次测量；筛查、事件、就诊准备各自录入。装机态写入本机资料目录。</p>`;
+  } else if (kind === 'rename-profile') {
+    title = '重命名档案';
+    body = `<div class="form-grid">${field('档案称呼<input data-f="name" value="${esc(pre.name)}">')}</div><p class="small-note" style="margin-top:8px">只改称呼，不改任何记录。</p>`;
   } else if (kind === 'family') {
     if (!v.item) { toast('写一句事项再保存', { long: true }); return; }
     (p.family.notes = p.family.notes || []).push({ d: v.d || null, item: v.item, visibility: 'private' });
@@ -1233,6 +1293,20 @@ function exportPack() {
 
 /* ---------------- AI 一键发送（34 号：achondroplasia:agent-draft · send:true） ---------------- */
 const EMBEDDED = () => window.parent && window.parent !== window;
+/* 默认提示词：按当前页生成（只填不发；上下文只含事实，不含判定词） */
+function defaultAgentPrompt() {
+  const base = AI_DEMOS[state.page]?.prompt || '帮我整理这一页的信息。'
+  return `${base}\n（已确认的档案上下文：${aiCtx()}）`
+}
+function agentOpen() {
+  if (EMBEDDED()) {
+    window.parent.postMessage({ type: 'achondroplasia:agent-open', prompt: defaultAgentPrompt() }, location.origin === 'null' ? '*' : location.origin)
+    toast('已请求打开 AI 对话并填入默认提示词（会话在右侧面板，按回车发送）', { long: true })
+    return
+  }
+  toggleAgent(true)
+  toast('演示面板：原型独立打开不假装发送——嵌入式（壳层 iframe）形态会拉起宿主 AI 对话并填入提示词', { long: true })
+}
 function agentSend(prompt) {
   if (EMBEDDED()) {
     window.parent.postMessage({ type: 'achondroplasia:agent-draft', prompt, send: true }, location.origin === 'null' ? '*' : location.origin);
@@ -1244,13 +1318,72 @@ function agentSend(prompt) {
 }
 
 /* ---------------- 档案切换（Q10：切换整页联动不串档） ---------------- */
-function openProfiles() {
-  openModal('切换演示档案', DATA.profiles.map((p) => `
-    <button class="profile profile-btn" data-action="use-profile" data-id="${esc(p.id)}" style="margin-bottom:10px;width:100%">
-      <div class="avatar" aria-hidden="true">${esc(p.name[0])}</div>
-      <div style="flex:1;text-align:left"><b>${esc(p.name)}的档案${p.id === state.profileId ? '（当前）' : ''}</b><span>${esc(p.age)} · ${esc(p.headline)}</span></div>
-      <span class="profile-caret">→</span>
-    </button>`).join('') + '<p class="small-note">A 档案=刚确诊记录少；B 档案=长期随访记录多。两套都是合成示例。</p>', '', '小苗宝 · 演示档案');
+async function openWorkspacePanel() {
+  if (DATA_SOURCE !== 'api') {
+    openModal('资料目录（演示态）', '<p class="small-note">当前是原型演示：未连上本机服务。装机后这里显示真实资料目录（由 DSH Desktop 指定，config.root = dshHomePath(\'achondroplasia\')），目录拒绝主目录/桌面/下载根。</p>', '', '小苗宝 · 资料目录'); return
+  }
+  try {
+    const res = await fetch(apiBase() + '/settings/workspace', { headers: { accept: 'application/json' }, credentials: 'same-origin' })
+    const info = await res.json()
+    if (!res.ok) throw new Error(info.message || ('HTTP ' + res.status))
+    const size = info.sizeBytes == null ? '未取得' : `${(info.sizeBytes / 1024).toFixed(1)} KB`
+    const migrations = (info.migrations || []).map((x) => `v${x.version}`).join(' / ') || '—'
+    openModal('资料目录', `<div class="card"><dl class="kv">
+      <dt>位置</dt><dd style="word-break:break-all"><code>${esc(info.root || info.file || '未配置')}</code></dd>
+      <dt>数据库</dt><dd style="word-break:break-all">${esc(info.file || '—')}</dd>
+      <dt>体积 / 可写</dt><dd class="nowrap-num">${esc(size)} · ${info.writable ? '可写' : '只读或未取得'}</dd>
+      <dt>表 / 迁移</dt><dd class="nowrap-num">${info.tables ?? '—'} 张 · ${esc(migrations)}</dd>
+      <dt>口径</dt><dd>资料目录由 DSH Desktop 指定（config.root = dshHomePath(\'achondroplasia\')），拒绝主目录/桌面/下载根；位置变更在宿主侧完成，本工作台不在此处改。</dd>
+    </dl></div><div class="actions" style="margin-top:10px">${btn('复制路径', 'copy-workspace-path', 'soft', `data-path="${esc(info.root || info.file || '')}"`)}</div>`, '', '小苗宝 · 资料目录')
+  } catch (e) {
+    openModal('资料目录', `<div class="notice danger">读取失败：${esc(e.message)}（资料目录由 DSH 宿主指定；请确认本机服务可用）</div>`, '', '小苗宝 · 资料目录')
+  }
+}
+
+function blankProfile(name, sex, ageLabel, careRole) {
+  const id = 'p' + Date.now()
+  return { id, name, sex: sex || null, age: ageLabel || null, ageLabel: ageLabel || null, careRole: careRole || 'caregiver',
+    headline: '新建档案 · 待记录',
+    dash: { stage: '新建档案 · 待记录', anchorLabel: '距建档', anchorDays: 0, anchorDate: TODAY, nextVisit: '下次随访待约（以预约为准）', lastHeight: { v: null, d: null }, lastHead: { v: null, d: null }, modeNote: '新建档案：先记录，随访节奏问医生。', sceneTitle: '现在到哪一步了', doctorQuote: '' },
+    dx: { timeline: [], genetics: null, notes: null },
+    metrics: { HEIGHT: [], WEIGHT: [], HEAD: [], BMIW: [] },
+    screenings: { hearing: [], sleep: [], craniocervical: [], spine: [], legs: [] },
+    events: { surgeries: [], meds: [], injections: [] },
+    docs: [], candidates: [], questions: [], hospitals: [], family: { visibility: 'private', notes: [] } }
+}
+
+function profileRow(p, current) {
+  return `<button class="profile profile-btn" data-action="use-profile" data-id="${esc(p.id)}" style="margin-bottom:8px;width:100%">
+    <div class="avatar" aria-hidden="true">${esc((p.name || '档')[0])}</div>
+    <div style="flex:1;text-align:left"><b>${esc(p.name)}${current ? '（当前）' : ''}</b><span>${esc(p.age || '年龄未记')} · ${esc(p.headline || '')}</span></div>
+    <span class="profile-caret">→</span>
+  </button>`
+}
+async function openProfiles() {
+  const demoMode = DATA_SOURCE !== 'api'
+  let archived = []
+  if (!demoMode) {
+    try {
+      const res = await fetch(apiBase() + '/profiles', { headers: { accept: 'application/json' }, credentials: 'same-origin' })
+      if (res.ok) archived = (await res.json()).archived || []
+    } catch { /* 归档区拉不到就不显示，不假装为空 */ }
+  }
+  const active = DATA.profiles
+  const cur = profile()
+  const body = `
+    ${active.map((p) => profileRow(p, p.id === state.profileId)).join('')}
+    <div class="actions" style="margin:6px 0 12px">${btn('＋ 新建档案', 'form-profile', 'primary')}
+      ${demoMode ? pill('演示态：新建仅在内存中，刷新重置', 'grey') : pill('装机态：写入本机资料目录', 'green')}</div>
+    <div class="section-title" style="margin:14px 0 8px"><div><h2 style="font-size:14px">管理当前档案</h2><p class="small-note">改名不影响记录；归档=从切换列表移出（可恢复），本台无删除。</p></div></div>
+    <div class="actions" style="margin-bottom:12px">
+      ${btn('重命名', 'rename-profile', 'soft', `data-id="${esc(cur.id)}" data-name="${esc(cur.name)}"`)}
+      ${btn('归档', 'archive-profile', 'soft', `data-id="${esc(cur.id)}"`)}
+    </div>
+    ${archived.length ? `<div class="section-title" style="margin:8px 0 8px"><div><h2 style="font-size:14px">已归档（${archived.length}）</h2></div></div>
+      ${archived.map((a) => `<div class="cand-row" style="margin-bottom:8px"><div class="cand-main"><b style="font-size:13px">${esc(a.name)}</b><p class="small-note">归档于 ${esc((a.archivedAt || '').slice(0, 10) || '未记录')}</p></div><div class="actions">${btn('恢复', 'restore-profile', 'soft', `data-id="${esc(a.profileKey)}"`)}</div></div>`).join('')}`
+      : (demoMode ? '' : '<p class="small-note">没有已归档档案。</p>')}
+    <p class="small-note" style="margin-top:10px">A 档案=刚确诊记录少；B 档案=长期随访记录多（示例）。新建档案从空开始：先记一次测量。</p>`
+  openModal(demoMode ? '切换演示档案' : '档案管理', body, '', '小苗宝 · 档案')
 }
 function useProfile(id) {
   if (id === state.profileId) { closeModal(); return; }
@@ -1332,11 +1465,12 @@ document.addEventListener('click', (e) => {
     case 'settings': openSettings(); break;
     case 'cfg-tab': cfgState.tab = t.dataset.tab; openSettings(); break;
     case 'primer-open-proxy': document.querySelector('[data-primer-open]')?.click(); break;
-    case 'open-store': openModal('资料目录', '<p class="small-note">原型演示：装机后由 DSH 宿主指定业务资料目录（config.root = dshHomePath(\'achondroplasia\')），目录拒绝主目录/桌面/下载根。</p>'); break;
+    case 'open-store': void openWorkspacePanel(); break;
+    case 'copy-workspace-path': { const path2 = t.dataset.path || ''; if (path2) { navigator.clipboard?.writeText(path2).then(() => toast('路径已复制'), () => toast('复制不可用，请手动选择')) } break; }
     case 'about': openModal(`关于 ${APP_INFO.name}`, `<p style="font-size:13.5px">版本 <b>${APP_INFO.version}</b>（构建 ${APP_INFO.build}）<br>软骨发育不全患儿家庭工作台 · 交互原型<br>全部数据为合成示例；本页未接入 DSH 宿主与 AI。</p>`); break;
     case 'help': openModal('原型操作说明', '<p style="font-size:13.5px">· 左侧切换 6 条一级线；页内页签在各页顶部。<br>· 顶栏「?」打开疾病概要（整页）。<br>· 「AI 协助 ↗」为 achondroplasia:agent-draft 协议链接（34 号）：嵌入式直接发送；独立打开走演示面板。<br>· 侧栏上方切换 A/B 演示档案。<br>· 所有数据为合成示例；刷新重置。</p>'); break;
     case 'close': closeModal(); break;
-    case 'agent-toggle': toggleAgent(); break;
+    case 'agent-toggle': agentOpen(); break;
     case 'agent-hide': toggleAgent(false); break;
     case 'range': state.range = t.dataset.range; render(); break;
     case 'sel-metric': {
@@ -1359,6 +1493,30 @@ document.addEventListener('click', (e) => {
     case 'form-surgery': openForm('surgery'); break;
     case 'form-injection': openForm('injection'); break;
     case 'form-question': openForm('question'); break;
+    case 'form-profile': openForm('profile'); break;
+    case 'rename-profile': openForm('rename-profile', { id: t.dataset.id, name: t.dataset.name }); break;
+    case 'archive-profile': {
+      const id = t.dataset.id;
+      if (DATA_SOURCE === 'api') {
+        void apiPostJson('/profiles', { action: 'archive', profileKey: id })
+          .then(async () => { closeModal(); DATA_SOURCE = await loadBootstrap(); const fallback = profile(); state.profileId = fallback?.id || state.profileId; applySourceBanner(); render(true); toast('已归档（可在「档案管理」里恢复）', { long: true }) })
+          .catch((e) => toast('未归档：' + e.message, { long: true }));
+      } else {
+        DATA.profiles = DATA.profiles.filter((x) => x.id !== id);
+        state.profileId = DATA.profiles[0]?.id || state.profileId;
+        closeModal(); render(true); toast('已移出切换列表（演示态；刷新恢复）');
+      }
+      break;
+    }
+    case 'restore-profile': {
+      const id = t.dataset.id;
+      if (DATA_SOURCE === 'api') {
+        void apiPostJson('/profiles', { action: 'restore', profileKey: id })
+          .then(async () => { await apiRefetch(); void openProfiles(); toast('已恢复', { long: true }) })
+          .catch((e) => toast('未恢复：' + e.message, { long: true }));
+      }
+      break;
+    }
     case 'form-doc': openForm('doc'); break;
     case 'form-hospital': openForm('hospital'); break;
     case 'correct-hospital': openForm('correct-hospital', { i: t.dataset.i, name: t.dataset.name, dept: t.dataset.dept, contact: t.dataset.contact }); break;

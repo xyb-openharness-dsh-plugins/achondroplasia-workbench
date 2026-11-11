@@ -12,6 +12,7 @@
 | `0003_candidate_bus_id.sql` | 7c65b028ed1d841c09400b79008b54f691553a3a89425432d8553550ffa3e9cf |
 | `0004_surgery_bus_id.sql` | c08973c0e73f0d35aa89cb611651e6df34cfc8e408a2bf378e3e2d97ebf9c3e8 |
 | `0005_trials_region.sql` | 48deb902b80adfab7d3ea5731065aa67f7de8b7c631c5325b5207d56c227c9fb |
+| `0006_subjects_manage.sql` | 0b533a8012540e429c0a442612117edfe816f430b4414fb307cca13e02b3051b |
 
 ## 0001 的内容边界（写在冻结之前，便于日后审）
 

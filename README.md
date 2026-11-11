@@ -22,37 +22,45 @@
 
 **看板**：大字状态 + 医生原话 + 行动带 + 快捷卡三连；记录概况含「N 条中私密 M 条」口径。
 
-![看板（档案 A · 刚确诊）](docs/screenshots/01-dashboard-demoA-v0.2.0.png)
+![看板（档案 A · 刚确诊）](docs/screenshots/01-dashboard-demoA-v0.2.2.png)
 
 **生长记录 · 一图秀**：每条序列独立条带、按该指标全期范围归一化并标注「不可比」；时间范围/指标（最多 4 条）/事件层三节 rail；点数据点回看原始来源。
 
-![生长一图秀（档案 B · 长期随访）](docs/screenshots/02-growth-chart-demoB-v0.2.0.png)
+![生长一图秀（档案 B · 长期随访）](docs/screenshots/02-growth-chart-demoB-v0.2.2.png)
 
 **分类指标卡**：真 3D 翻转（定高 194px，翻面是口径说明与「仅回顾不解读」；差值不写任何结论）。
 
-![指标卡（正面）](docs/screenshots/03-metric-cards-v0.2.0.png)
-![指标卡（翻面口径）](docs/screenshots/04-metric-card-flipped-v0.2.0.png)
+![指标卡（正面）](docs/screenshots/03-metric-cards-v0.2.2.png)
+![指标卡（翻面口径）](docs/screenshots/04-metric-card-flipped-v0.2.2.png)
 
 **筛查台账**：按听力/睡眠/颅颈/脊柱/下肢分区的结果原文台账；频次与项目以医生安排为准。
 
-![筛查台账](docs/screenshots/05-screening-ledger-v0.2.0.png)
+![筛查台账](docs/screenshots/05-screening-ledger-v0.2.2.png)
 
 **事件档案**：手术/注射折叠卡（打印全展开），医生原话照抄，更正=新增版本。
 
-![手术折叠卡（收起）](docs/screenshots/06-events-fold-closed-v0.2.0.png)
-![手术折叠卡（展开）](docs/screenshots/07-events-fold-open-v0.2.0.png)
+![手术折叠卡（收起）](docs/screenshots/06-events-fold-closed-v0.2.2.png)
+![手术折叠卡（展开）](docs/screenshots/07-events-fold-open-v0.2.2.png)
 
 **临床试验**：登记快照 + 候选线索（n/m 项对得上 · k 项待确认 + 逐条判据三态；无匹配指数与判读列；示例条目为虚构）。
 
-![临床试验匹配](docs/screenshots/08-trials-match-v0.2.0.png)
+![临床试验匹配](docs/screenshots/08-trials-match-v0.2.2.png)
 
 **疾病概要（?）**：整页四段（定义→规范与指南→治疗全景→趋势），逐条来源 + 固定免责。
 
-![疾病概要整页](docs/screenshots/09-disease-primer-v0.2.0.png)
+![疾病概要整页](docs/screenshots/09-disease-primer-v0.2.2.png)
 
 **就诊准备**：资料包预览整页视图 + 导出（私密三出口过滤 + 家长代记标记）+ 待问清单。
 
-![资料包预览](docs/screenshots/10-pack-preview-v0.2.0.png)
+![资料包预览](docs/screenshots/10-pack-preview-v0.2.2.png)
+
+**资料目录（装机态）**：显示宿主指定的真实路径、数据库文件、体积/可写、表与迁移账本，可复制路径。
+
+![资料目录](docs/screenshots/11-workspace-dialog-v0.2.2.png)
+
+**档案管理**：新建档案（从空状态开始）、切换、重命名、归档与恢复（无删除）。
+
+![档案管理](docs/screenshots/12-profile-manage-v0.2.2.png)
 
 ## 怎么用
 

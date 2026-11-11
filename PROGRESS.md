@@ -22,6 +22,13 @@
 - 报告与修复留痕：docs/inspector/2026-11-06-M6-对齐后全量.md；BACKFLOW 第三轮。
 - 修复后回归：check 全绿（test 29/29）· probe 17/17 · audit 44/44。
 
+## 0.2.2 装机三问题修复（2026-11-12）
+- **首页 AI 对话**：嵌入式改为 `achondroplasia:agent-open`（携带当前页默认提示词+档案上下文，只填不发）拉起宿主原生对话；并修复宿主帧监听消息类型写错（`cervi:agent-draft` → `achondroplasia:agent-draft/agent-open`，此前桥一直全哑）。
+- **资料目录**：新增 `GET /settings/workspace`（真实路径/库文件/体积/可写/表数/迁移账本）+ 复制路径；演示态如实标注。dev-server 与宿主两条链路共用（Workbench.workspaceInfo）。
+- **新建档案与管理**：`0006_subjects_manage.sql`（in_use/archived_at）+ `POST /profiles`（create/rename/archive/restore，无裸删除）+ `GET /profiles`；切换器加「＋ 新建档案」与归档区恢复；新建档案从空状态开始（空态 CTA 齐备，修 `mem()` 惰性初始化崩溃）。
+- 验证：check 全绿（test 30/30 含档案管理用例）、audit 44/44、probe 17/17；浏览器全流程实测（新建→空看板→记一条→归档→恢复）+ 消息协议实测（agent-open 带默认提示词）；0.2.2 tgz 已装入 Desktop profile（装机副本内核验：消息类型/workspace 路由/新 UI 均在）。
+- 截图全量重摄 v0.2.2（含新增「资料目录」「档案管理」两张），README 引用同步。
+
 ## 下一步（晨间）
 1. 追认 5 份自动签认；2. 重启 DSH Desktop → 新会话 → verify-desktop-load + 真机走查 → 真机截图 → V3；3. 追认后执行 M7 发布命令与 M8 PR。
 

@@ -248,7 +248,7 @@
         return [
           '你正在协助我使用「小苗宝 GrowPal 软骨发育不全工作台」。它只做本机资料整理，不提供诊疗建议。',
           `资料目录：${dir || '（首次打开时在面板里选择）'}`,
-          '里面是我的检查报告、FIGO 分期与病理、治疗安排、随访与并发症记录、就诊问题清单。',
+          '里面是我的生长记录（身长/体重/头围）、筛查台账（听力/睡眠/颅颈/脊柱/下肢）、手术与注射事件、就诊准备材料与问题清单。',
           '分工：你帮我汇总、找缺漏、把报告里的指标和日期整理成对照表；判断和决定由我和治疗团队做。',
           '我标记的"看法"是我自己的担心或判断，不是医生结论。',
         ].join('\n')
@@ -416,7 +416,9 @@ rememberDraft({ sessionId: id, prompt: prompt || onboardingPrompt(dir) })
         React.useEffect(() => {
           function onMessage(event) {
             const data = event.data
-            if (!data || typeof data !== 'object' || data.type !== 'cervi:agent-draft') return
+            if (!data || typeof data !== 'object') return
+            /* 业务页 → 宿主帧：agent-draft=「和 AI 讨论」带上下文；agent-open=顶栏 AI 对话（只填默认提示词） */
+            if (data.type !== 'achondroplasia:agent-draft' && data.type !== 'achondroplasia:agent-open') return
             const frame = frameRef.current
             // 不认"谁都能发"的消息：必须来自我们自己的 iframe，且同源。
             if (!frame || event.source !== frame.contentWindow) return

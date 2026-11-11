@@ -195,6 +195,57 @@ export function createApiHandler({ source, version, build, serveUi, failure = nu
       }
     }
 
+    /* 资料目录（装机态真实路径与用量；演示态如实标注）。 */
+    if (path === `${API_PREFIX}/settings/workspace`) {
+      if (req.method !== 'GET') return sendJson(res, 405, { error: 'method_not_allowed' })
+      try {
+        const fs = await import('node:fs')
+        const { statSync, existsSync } = fs
+        const info = typeof source.workspaceInfo === 'function'
+          ? source.workspaceInfo()
+          : typeof source.workspace === 'function'
+            ? source.workspace()
+            : (typeof source.workspace === 'string' && source.workspace
+              ? { mode: 'dsh', root: source.workspace, file: null }
+              : { mode: 'demo', root: null, file: null })
+        const out = { mode: info.mode, root: info.root, file: info.file, writable: false, sizeBytes: null, tables: null, migrations: null }
+        if (info.file && info.file !== ':memory:' && existsSync(info.file)) {
+          try { const st = statSync(info.file); out.sizeBytes = st.size; out.writable = (st.mode & 0o200) !== 0 } catch { /* 读数失败如实留空 */ }
+        }
+        if (source.db && typeof source.db.prepare === 'function') {
+          try { out.tables = source.db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").get().n } catch { /* 同上 */ }
+          try { out.migrations = source.db.prepare('SELECT version, applied_at FROM schema_migrations ORDER BY version').all().map((r) => ({ version: r.version, appliedAt: r.applied_at })) } catch { /* 同上 */ }
+        }
+        return sendJson(res, 200, out)
+      } catch (error) {
+        return sendJson(res, 500, { error: 'workspace_unavailable', message: error.message })
+      }
+    }
+
+    /* 档案管理（新建/重命名/归档/恢复 + 切换列表；无裸删除）。 */
+    if (path === `${API_PREFIX}/profiles`) {
+      if (req.method === 'GET') {
+        try {
+          const rm = await import('./readmodels.js')
+          return sendJson(res, 200, rm.profileDirectory(source.db))
+        } catch (error) { return sendJson(res, 500, { error: 'profiles_unavailable', message: error.message }) }
+      }
+      if (req.method !== 'POST') return sendJson(res, 405, { error: 'method_not_allowed' })
+      try {
+        const body = JSON.parse((await readBody(req, 64 * 1024)).toString('utf8') || '{}')
+        const rm = await import('./readmodels.js')
+        const action = String(body.action ?? 'create')
+        if (action === 'create') return sendJson(res, 200, { ok: true, ...rm.createProfile(source.db, body) })
+        if (action === 'rename') return sendJson(res, 200, { ok: true, ...rm.renameProfile(source.db, String(body.profileKey ?? ''), body.name) })
+        if (action === 'archive') return sendJson(res, 200, { ok: true, ...rm.archiveProfile(source.db, String(body.profileKey ?? '')) })
+        if (action === 'restore') return sendJson(res, 200, { ok: true, ...rm.restoreProfile(source.db, String(body.profileKey ?? '')) })
+        return sendJson(res, 400, { error: 'unknown_action' })
+      } catch (error) {
+        const status = error?.status ?? 500
+        return sendJson(res, status, { error: 'profiles_failed', message: error.message })
+      }
+    }
+
     /* 记录写入（apiSaveRecord 统一入口；kind 白名单在 readmodels.RECORD_KINDS）。 */
     const recordsMatch = path.match(new RegExp(`^${API_PREFIX}/records/([a-z-]+)$`))
     if (recordsMatch) {

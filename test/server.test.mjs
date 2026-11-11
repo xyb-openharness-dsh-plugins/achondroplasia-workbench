@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { openDatabase, migrate } from '../dsh/store.js'
 import { seedDemo } from '../dsh/demo.js'
-import { bootstrap, getProfile, saveRecord } from '../dsh/readmodels.js'
+import { bootstrap, getProfile, saveRecord, createProfile, renameProfile, archiveProfile, restoreProfile, profileDirectory } from '../dsh/readmodels.js'
 
 function makeSource() {
   const db = openDatabase(':memory:')
@@ -58,6 +58,32 @@ test('候选三态：accept/reject 只改状态；rejected 不再出现在 pendi
   const pend = src.db.prepare("SELECT cand_id FROM candidate_fields WHERE state='pending' ORDER BY rowid").all().map((r) => r.cand_id)
   assert.ok(!pend.includes(cands[0].cand_id))
 })
+
+test('档案管理：新建（空档案可读）→ 重命名 → 归档（列表移出）→ 恢复', () => {
+  const src = makeSource()
+  const rm = createProfile(src.db, { name: '小禾', sex: '女', ageLabel: '3 岁 2 月', careRole: 'caregiver' })
+  assert.ok(rm.profileKey)
+  const p = getProfile(src.db, rm.profileKey)
+  assert.equal(p.name, '小禾')
+  assert.deepEqual(p.metrics.HEIGHT, [])
+  assert.equal(p.dash.anchorLabel, '距建档')
+  assert.equal(p.dash.anchorDays, 0)
+  assert.ok(Array.isArray(p.screenings.hearing) && p.screenings.hearing.length === 0)
+  assertEqualsLike(p.hospitals, [])
+  renameProfile(src.db, rm.profileKey, '小禾禾')
+  assert.equal(getProfile(src.db, rm.profileKey).name, '小禾禾')
+  const dir1 = profileDirectory(src.db)
+  assert.ok(dir1.active.some((x) => x.profileKey === rm.profileKey))
+  archiveProfile(src.db, rm.profileKey)
+  const dir2 = profileDirectory(src.db)
+  assert.ok(!dir2.active.some((x) => x.profileKey === rm.profileKey), '归档后不在在用列表')
+  assert.ok(dir2.archived.some((x) => x.profileKey === rm.profileKey), '归档区可见')
+  assert.ok(!src.bootstrap('t', 'b').profiles.some((x) => x.id === rm.profileKey), '归档档案不出现在 bootstrap 档案列表（数据保留可恢复）')
+  restoreProfile(src.db, rm.profileKey)
+  assert.equal(getProfile(src.db, rm.profileKey).name, '小禾禾')
+  assert.equal(src.bootstrap('t', 'b').profiles.length, 3)
+})
+function assertEqualsLike(a, b) { assert.deepEqual(JSON.parse(JSON.stringify(a)), b) }
 
 test('导出：私密（viewpoints）整段排除；含代记标记', async () => {
   const src = makeSource()
