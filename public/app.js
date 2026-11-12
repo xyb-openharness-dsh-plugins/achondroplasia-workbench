@@ -13,7 +13,7 @@
    - 非肿瘤红线：无「达标/落后」判定、无风险评分；阈值与频次一律【待核】或医生原话。 */
 'use strict';
 const $ = (s, r = document) => r.querySelector(s);
-const APP_INFO = { name: '小苗宝 GrowPal', version: '0.2.2', build: '2026-11-06' };
+const APP_INFO = { name: '小苗宝 GrowPal', version: '0.2.3', build: '2026-11-06' };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dOf = (d) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : null);
 const fmtD = (d) => (d && d.length >= 10 ? d.slice(0, 10) : String(d ?? ''));

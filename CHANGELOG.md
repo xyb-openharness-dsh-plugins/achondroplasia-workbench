@@ -1,3 +1,21 @@
+## 0.2.3 — 2026-11-13
+
+三缺口批量补齐（A 型：临床线与新建患者早已就绪，只缺资料目录入口）：
+
+- **资料目录真入口**：面板顶栏新增「配置目录」→ `uiWorkspace.pickDirectory()` → 口径硬拒（主目录本身/桌面/下载根/tmp，客户端 + 服务端双判）→ `POST /api/esophageal/api/root` 落盘回显。
+- 用 starter 的 `templates/fix-data-dir.mjs` 一次生成（按 `onClick: onAgentClick` 回溯定位按钮，不依赖缩进）。
+- `cordis.patch.yml` 补 `config.root: !!js dshHomePath(…)`。
+- 校验：三闸门全绿；`npm run check` 全绿。
+
+## 0.2.3 — 2026-11-13
+
+三缺口批量补齐（A 型：临床线与新建患者早已就绪，只缺资料目录入口）：
+
+- **资料目录真入口**：面板顶栏新增「配置目录」→ `uiWorkspace.pickDirectory()` → 口径硬拒（主目录本身/桌面/下载根/tmp，客户端 + 服务端双判）→ `POST /api/achondroplasia/api/root` 落盘回显。
+- 用 starter 的 `templates/fix-data-dir.mjs` 一次生成（按 `onClick: onAgentClick` 回溯定位按钮，不依赖缩进）。
+- 本仓原型是**冻结快照**：版本字面量随包前移后必须同步 `FROZEN_PROTOTYPE` 并保持 public 与 prototypes 逐字节一致（已重冻结，渲染内容未变）。
+- 校验：三闸门全绿；`npm run check` 全绿。
+
 ## 0.2.1（2026-11-11，AI 对话面板激活修复）
 
 - 会话判定改用宿主归属 `ownedSession()`（`ownsSession(currentSession())`），不再用 `Boolean(conversation)`（customFrame 下没会话也会传隐藏容器，判断恒为真 → 点了没反应）。
