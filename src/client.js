@@ -257,7 +257,7 @@
       /* ---------------- 面板（customFrame） ---------------- */
 
       /* 资料目录：口径与服务端同一条规则（服务端会再判一遍） */
-      const DATA_ROOT_URL = '/api/achondroplasia/api/root'
+      const DATA_ROOT_URL = '/api/achondroplasia/settings/workspace'
       const HOME_EXACT = new RegExp('^(\\/Users\\/[^/]+|\\/home\\/[^/]+|\\/root|[A-Za-z]:\\\\Users\\\\[^\\\\]+)$', 'i')
       const FORBIDDEN_DIR = new RegExp('((Desktop|桌面)$|(Downloads?|下载(夹)?)$|^(\\/tmp|\\/private\\/tmp|\\/var\\/folders\\/|\\/private\\/var\\/folders\\/))', 'i')
       const isForbiddenDir = (dir) => HOME_EXACT.test(dir) || FORBIDDEN_DIR.test(dir)
